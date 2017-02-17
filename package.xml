@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>move_base_to_manip</name>
+  <version>1.0.0</version>
+  <description>
+      Move the robot base until a desired end-effector pose can be reached.
+  </description>
+
+  <author>Andy Zelenak</author>
+  <author email="andyz@utexas.edu">Andy Zelenak</author>
+  <maintainer email="andyz@utexas.edu">Andy Zelenak</maintainer>
+
+  <license>See license.txt</license>
+
+  <url type="website">http://wiki.ros.org/move_base_to_manip</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  <depend>move_base_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>visualization_msgs</depend>
+</package>
