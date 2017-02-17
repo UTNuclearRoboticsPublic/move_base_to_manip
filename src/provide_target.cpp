@@ -61,7 +61,6 @@ int main(int argc, char **argv)
   provide_target::desired_ee_pose.pose.orientation.z = 0.;
   provide_target::desired_ee_pose.pose.orientation.w = 1.;
 
-
   // Cosmetic details for Rviz
   provide_target::desired_ee_pose.type = visualization_msgs::Marker::CYLINDER;
   provide_target::desired_ee_pose.scale.x = 0.09;
