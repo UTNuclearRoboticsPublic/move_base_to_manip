@@ -74,10 +74,10 @@ int main(int argc, char **argv)
 
   // Start a service. Wait until another node requests the desired pose, then shut down (if requested).
   ros::ServiceServer service = nh.advertiseService("desired_robot_pose", desired_robot_pose);
-  while ( !provide_target::shutdown_now ) // Until the client(s) requests a shutdown
+  while ( !provide_target::shutdown_now && ros::ok() ) // Until the client(s) requests a shutdown
   {  
     ros::spinOnce();
-    ros::Duration(10).sleep();
+    ros::Duration(0.5).sleep();
   }
 
   ros::shutdown();
