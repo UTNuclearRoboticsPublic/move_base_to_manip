@@ -141,10 +141,6 @@ int main(int argc, char **argv)
   geometry_msgs::PoseStamped desired_height_orient = desired_pose;
   desired_height_orient.pose.position.x = start_pose.pose.position.x;
   desired_height_orient.pose.position.y = start_pose.pose.position.y;
-  
-  // Give clearance to approach from above. Also, don't break the LIDAR beam
-  // and get added to the costmap
-  desired_height_orient.pose.position.z = desired_pose.pose.position.z + .33;
 
   ///////////////////////////////////////////////////
   // Put the EE at the height & orientation we desire
