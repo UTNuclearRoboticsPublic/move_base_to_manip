@@ -11,7 +11,6 @@ namespace provide_target
 
 
 // This service provides a desired pose to the requester, then shuts down the node.
-// In this case, it provides the desired ee pose to grasp the sensor.
 bool desired_robot_pose(move_base_to_manip::desired_robot_pose::Request  &req,
          move_base_to_manip::desired_robot_pose::Response &res)
 {
