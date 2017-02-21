@@ -60,9 +60,19 @@ target_link_libraries(move_base_to_manip ${catkin_LIBRARIES} )
 ## Install ##
 #############
 
-# Mark executables and/or libraries for installation
 install(TARGETS move_base_to_manip provide_target
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY srv
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+
