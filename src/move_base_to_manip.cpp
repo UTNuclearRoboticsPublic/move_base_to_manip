@@ -77,7 +77,7 @@ void set_node_params(ros::NodeHandle &nh)
 }
 
 // Helper function to plan a Cartesian motion
-const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroup& moveGroup, ros::NodeHandle &nh)
+const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup, ros::NodeHandle &nh)
 {
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_octomap;
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
   
   std::string move_group_name;
   nh.getParam("move_group_name", move_group_name);
-  moveit::planning_interface::MoveGroup moveGroup( move_group_name );
+  moveit::planning_interface::MoveGroupInterface moveGroup( move_group_name );
   std::string move_group_planner;
   nh.getParam("move_group_planner", move_group_planner);
   moveGroup.setPlannerId( move_group_planner );
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
   nh.getParam("orientation_tolerance", orient_tol);
   moveGroup.setGoalOrientationTolerance(orient_tol);
   
-  moveit::planning_interface::MoveGroup::Plan move_plan;
+  moveit::planning_interface::MoveGroupInterface::Plan move_plan;
   
   geometry_msgs::PoseStamped start_pose = moveGroup.getCurrentPose();
 
