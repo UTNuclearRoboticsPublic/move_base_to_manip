@@ -2,8 +2,8 @@
 Changelog for package move_base_to_manip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.1 (2017-02-21)
+------------------
 * Adding another error message.
 * Making the while loop exit gracefully.
 * Updating a comment in provide_target.cpp.
