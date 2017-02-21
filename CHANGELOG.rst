@@ -2,8 +2,8 @@
 Changelog for package move_base_to_manip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.3 (2017-02-21)
+------------------
 * Adding dependencies to package.xml.
 * Contributors: nrgadmin
 
