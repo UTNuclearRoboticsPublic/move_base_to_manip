@@ -2,6 +2,11 @@
 Changelog for package move_base_to_manip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Adding CMakeLists to install everything.
+* Contributors: nrgadmin
+
 1.0.1 (2017-02-21)
 ------------------
 * Adding another error message.
