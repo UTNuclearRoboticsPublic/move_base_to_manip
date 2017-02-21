@@ -169,6 +169,7 @@ PLAN_AGAIN:
       if( !moveGroup.plan(move_plan) ) // One last attempt
       {
         ROS_ERROR("Failed to reach the desired height and orientation.");
+        ROS_ERROR("Try starting from an arm position with better manipulability.");
         ros::shutdown();
         return FAILURE;
       }
