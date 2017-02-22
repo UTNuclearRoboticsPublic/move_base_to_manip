@@ -2,6 +2,11 @@
 Changelog for package move_base_to_manip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* move_base_to_manip: Making it optional to flip the gripper.
+* Contributors: nrgadmin
+
 1.0.3 (2017-02-21)
 ------------------
 * Adding dependencies to package.xml.
