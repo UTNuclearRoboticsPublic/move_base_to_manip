@@ -1,52 +1,52 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(move_base_to_manip)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
+
+add_compile_options(-std=c++11)
+
+find_package(Eigen3 REQUIRED)
+
+# Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
+if(NOT EIGEN3_INCLUDE_DIRS)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+endif()
+
 find_package(catkin REQUIRED COMPONENTS
   message_generation
+  moveit_core
+  moveit_ros_planning
   moveit_ros_planning_interface
   roscpp
   tf
 )
 
-# Generate services in the 'srv' folder
 add_service_files(
   FILES
   desired_robot_pose.srv
 )
 
-# Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
   geometry_msgs  # Or other packages containing msgs
 )
 
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES ur_gazebo
-  CATKIN_DEPENDS move_base_msgs roscpp
-#  DEPENDS
+  CATKIN_DEPENDS
+    move_base_msgs
+    moveit_core
+    moveit_ros_planning_interface
+    interactive_markers
+    roscpp
+  DEPENDS
+    EIGEN3
 )
 
 ###########
 ## Build ##
 ###########
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-# Declare cpp executables
 add_executable(provide_target src/provide_target.cpp)
 add_dependencies(provide_target ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} geometry_msgs visualization_msgs)
 target_link_libraries(provide_target ${catkin_LIBRARIES} )
@@ -59,6 +59,10 @@ target_link_libraries(move_base_to_manip ${catkin_LIBRARIES} )
 #############
 ## Install ##
 #############
+
+include_directories(SYSTEM ${Boost_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS})
+link_directories(${catkin_LIBRARY_DIRS})
 
 install(TARGETS move_base_to_manip provide_target
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
