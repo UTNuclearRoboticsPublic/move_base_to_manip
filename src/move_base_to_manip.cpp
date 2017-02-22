@@ -74,6 +74,13 @@ void set_node_params(ros::NodeHandle &nh)
     
  if (!nh.hasParam("orientation_tolerance"))
     nh.setParam("orientation_tolerance", 0.0001);
+
+ // If true, the planner will try to flip the gripper +/-180 deg about Z when it cannot reach a pose
+ if (!nh.hasParam("ok_to_flip"))
+ {
+   bool temp = true;
+   nh.setParam("ok_to_flip", temp);
+  }
 }
 
 // Helper function to plan a Cartesian motion
@@ -156,7 +163,9 @@ int main(int argc, char **argv)
   tf::Matrix3x3(gripper_quat).getRPY(object_roll, object_pitch, object_yaw);
 
 PLAN_AGAIN:
-  if ( !moveGroup.plan(move_plan) )  // If it fails, try spinning the gripper 180deg
+  bool ok_to_flip;
+  nh.getParam("ok_to_flip", ok_to_flip);
+  if ( !moveGroup.plan(move_plan) && ok_to_flip )  // If it fails, try spinning the gripper 180deg
   {
     geometry_msgs::Quaternion gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw +3.14159);
     desired_height_orient.pose.orientation = gripper_quat_msg;
