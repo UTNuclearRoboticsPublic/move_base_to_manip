@@ -28,6 +28,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   geometry_msgs  # Or other packages containing msgs
+  visualization_msgs
 )
 
 catkin_package(
