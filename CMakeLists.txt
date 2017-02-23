@@ -48,11 +48,11 @@ catkin_package(
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(provide_target src/provide_target.cpp)
-add_dependencies(provide_target ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} geometry_msgs visualization_msgs)
+add_dependencies(provide_target ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(provide_target ${catkin_LIBRARIES} )
 
 add_executable(move_base_to_manip src/move_base_to_manip.cpp)
-add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} geometry_msgs )
+add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(move_base_to_manip ${catkin_LIBRARIES} )
 
 
