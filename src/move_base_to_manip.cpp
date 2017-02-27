@@ -89,7 +89,10 @@ const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msg
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_octomap;
   if ( nh.getParam("clear_octomap", clear_octomap) )
-    system("rosservice call /clear_octomap");
+  {
+    int clear_octomap = 0;
+    clear_octomap = system("rosservice call /clear_octomap");
+  }
   double cartesian_path_resolution;
   nh.getParam("cartesian_plan_res", cartesian_path_resolution);
   double fraction = moveGroup.computeCartesianPath( waypoints, cartesian_path_resolution, 0.0, trajectory);
