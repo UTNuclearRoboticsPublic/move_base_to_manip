@@ -1,7 +1,7 @@
 
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
-# include "move_base_to_manip.h"
+#include "move_base_to_manip.h"
 #include "move_base_to_manip/desired_robot_pose.h"
 
 /////////////////
@@ -44,6 +44,13 @@ void set_node_params(ros::NodeHandle &nh)
   {
     bool temp = true;  
     nh.setParam("clear_octomap", temp);
+  }
+
+  // Clear the move_base costmaps before moving the base?
+  if (!nh.hasParam("clear_costmaps"))
+  {
+    bool temp = true;  
+    nh.setParam("clear_costmaps", temp);
   }
 
   // Prompt the user to approve each arm motion before it executes?
@@ -89,7 +96,7 @@ const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msg
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_octomap;
   if ( nh.getParam("clear_octomap", clear_octomap) )
-    system("rosservice call /clear_octomap");
+    move_base_to_manip::clear_octomap_client.call(empty_srv);
   double cartesian_path_resolution;
   nh.getParam("cartesian_plan_res", cartesian_path_resolution);
   double fraction = moveGroup.computeCartesianPath( waypoints, cartesian_path_resolution, 0.0, trajectory);
@@ -127,6 +134,10 @@ int main(int argc, char **argv)
   moveit::planning_interface::MoveGroup::Plan move_plan;
   
   geometry_msgs::PoseStamped start_pose = moveGroup.getCurrentPose();
+
+  // Set up services
+  move_base_to_manip::clear_octomap_client = nh.serviceClient<std_srvs::Empty>("clear_octomap");
+  move_base_to_manip::clear_costmaps_client = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
 
   ////////////////////////////////////////////////////////////////////////
   // Get the desired EE pose from the "desired_robot_pose" service.
@@ -310,6 +321,12 @@ PLAN_CARTESIAN_AGAIN:
   baseVisualizationPublisher.publish(baseMarker);
   ros::Duration(1).sleep();
   
+  // May want to disable collision checking or the manipulator will not approach an object.
+  bool clear_costmaps;
+  if ( nh.getParam("clear_costmaps", clear_costmaps) )
+    move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
+
+  // Send the goal to move_base
   ac.sendGoal(goal);
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
