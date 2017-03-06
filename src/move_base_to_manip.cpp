@@ -46,6 +46,13 @@ void set_node_params(ros::NodeHandle &nh)
     nh.setParam("clear_octomap", temp);
   }
 
+  // Clear the move_base costmaps before moving the base?
+  if (!nh.hasParam("clear_costmaps"))
+  {
+    bool temp = true;  
+    nh.setParam("clear_costmaps", temp);
+  }
+
   // Prompt the user to approve each arm motion before it executes?
   if (!nh.hasParam("prompt_before_motion"))
   {
@@ -90,8 +97,7 @@ const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msg
   bool clear_octomap;
   if ( nh.getParam("clear_octomap", clear_octomap) )
   {
-    int clear_octomap = 0;
-    clear_octomap = system("rosservice call /clear_octomap");
+    move_base_to_manip::clear_octomap_client.call(empty_srv);
   }
   double cartesian_path_resolution;
   nh.getParam("cartesian_plan_res", cartesian_path_resolution);
@@ -130,6 +136,10 @@ int main(int argc, char **argv)
   moveit::planning_interface::MoveGroupInterface::Plan move_plan;
   
   geometry_msgs::PoseStamped start_pose = moveGroup.getCurrentPose();
+
+  // Set up services
+  move_base_to_manip::clear_octomap_client = nh.serviceClient<std_srvs::Empty>("clear_octomap");
+  move_base_to_manip::clear_costmaps_client = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
 
   ////////////////////////////////////////////////////////////////////////
   // Get the desired EE pose from the "desired_robot_pose" service.
@@ -312,6 +322,11 @@ PLAN_CARTESIAN_AGAIN:
   baseMarker.lifetime = ros::Duration();
   baseVisualizationPublisher.publish(baseMarker);
   ros::Duration(1).sleep();
+
+  // May want to disable collision checking or the manipulator will not approach an object.
+  bool clear_costmaps;
+  if ( nh.getParam("clear_costmaps", clear_costmaps) )
+    move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
   
   ac.sendGoal(goal);
 

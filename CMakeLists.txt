@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning
   moveit_ros_planning_interface
   roscpp
+  std_srvs
   tf
 )
 
@@ -28,6 +29,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   geometry_msgs  # Or other packages containing msgs
+  std_srvs
   visualization_msgs
 )
 
