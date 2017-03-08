@@ -5,7 +5,6 @@
 //////////////////////////////////////////////////////////////////
 
 #include "moveit/move_group_interface/move_group_interface.h"
-#include "moveit/robot_model_loader/robot_model_loader.h"
 #include "moveit_msgs/DisplayTrajectory.h"
 #include "std_srvs/Empty.h"
 
