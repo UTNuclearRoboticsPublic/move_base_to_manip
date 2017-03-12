@@ -1,8 +1,5 @@
 
-#include <actionlib/client/simple_action_client.h>
-#include <move_base_msgs/MoveBaseAction.h>
 # include "move_base_to_manip.h"
-#include "move_base_to_manip/desired_robot_pose.h"
 
 /////////////////
 // The algorithm:
@@ -21,91 +18,6 @@
 // corrections as needed.
 
 ///////////////////////////////////////////////////
-
-
-// Helper function to set node parameters, if they aren't defined in a launch file
-void set_node_params(ros::NodeHandle &nh)
-{
-  // Make the base move just a bit farther than the minimum req'd distance.
-  // This should be a fraction between 0-1
-  // Smaller ==> Will move closer to the goal pose 
-  if (!nh.hasParam("motion_buffer"))
-    nh.setParam("motion_buffer", 0.15);
-
-  // Use a Cartesian motion plan or a regular motion plan?
-  if (!nh.hasParam("move_cartesian"))
-  {
-    bool temp = false;
-    nh.setParam("move_cartesian", temp);
-  }
-
-  // Clear the Octomap collision scene before planning the final arm motion?
-  if (!nh.hasParam("clear_octomap"))
-  {
-    bool temp = true;  
-    nh.setParam("clear_octomap", temp);
-  }
-
-  // Clear the move_base costmaps before moving the base?
-  if (!nh.hasParam("clear_costmaps"))
-  {
-    bool temp = true;  
-    nh.setParam("clear_costmaps", temp);
-  }
-
-  // Prompt the user to approve each arm motion before it executes?
-  if (!nh.hasParam("prompt_before_motion"))
-  {
-    bool temp = true;
-    nh.setParam("prompt_before_motion", temp);
-  }
-
-  // Cartesian planning resolution, in meters
-  if (!nh.hasParam("cartesian_plan_res"))
-    nh.setParam("cartesian_plan_res", 0.005);
-
-  if (!nh.hasParam("move_group_name"))
-    nh.setParam("move_group_name", "right_ur5");
-
-  if (!nh.hasParam("move_group_planner"))
-    nh.setParam("move_group_planner", "RRTConnectkConfigDefault");
-
-  if (!nh.hasParam("velocity_scale"))
-    nh.setParam("velocity_scale", 0.1);
-
-  if (!nh.hasParam("base_frame_name"))
-    nh.setParam("base_frame_name", "base_link");
-    
- if (!nh.hasParam("position_tolerance"))
-    nh.setParam("position_tolerance", 0.01);
-    
- if (!nh.hasParam("orientation_tolerance"))
-    nh.setParam("orientation_tolerance", 0.0001);
-
- // If true, the planner will try to flip the gripper +/-180 deg about Z when it cannot reach a pose
- if (!nh.hasParam("ok_to_flip"))
- {
-   bool temp = true;
-   nh.setParam("ok_to_flip", temp);
-  }
-}
-
-// Helper function to plan a Cartesian motion
-const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup, ros::NodeHandle &nh)
-{
-  // May want to disable collision checking or the manipulator will not approach an object.
-  bool clear_octomap;
-  if ( nh.getParam("clear_octomap", clear_octomap) )
-  {
-    move_base_to_manip::clear_octomap_client.call(empty_srv);
-  }
-  double cartesian_path_resolution;
-  nh.getParam("cartesian_plan_res", cartesian_path_resolution);
-  double fraction = moveGroup.computeCartesianPath( waypoints, cartesian_path_resolution, 0.0, trajectory);
-
-  return fraction;
-}
-
 
 int main(int argc, char **argv)
 {
@@ -334,4 +246,87 @@ PLAN_CARTESIAN_AGAIN:
 
   ros::shutdown();
   return SUCCESS;
+}
+
+// Helper function to set node parameters, if they aren't defined in a launch file
+void move_base_to_manip::set_node_params(ros::NodeHandle &nh)
+{
+  // Make the base move just a bit farther than the minimum req'd distance.
+  // This should be a fraction between 0-1
+  // Smaller ==> Will move closer to the goal pose 
+  if (!nh.hasParam("motion_buffer"))
+    nh.setParam("motion_buffer", 0.15);
+
+  // Use a Cartesian motion plan or a regular motion plan?
+  if (!nh.hasParam("move_cartesian"))
+  {
+    bool temp = false;
+    nh.setParam("move_cartesian", temp);
+  }
+
+  // Clear the Octomap collision scene before planning the final arm motion?
+  if (!nh.hasParam("clear_octomap"))
+  {
+    bool temp = true;  
+    nh.setParam("clear_octomap", temp);
+  }
+
+  // Clear the move_base costmaps before moving the base?
+  if (!nh.hasParam("clear_costmaps"))
+  {
+    bool temp = true;  
+    nh.setParam("clear_costmaps", temp);
+  }
+
+  // Prompt the user to approve each arm motion before it executes?
+  if (!nh.hasParam("prompt_before_motion"))
+  {
+    bool temp = true;
+    nh.setParam("prompt_before_motion", temp);
+  }
+
+  // Cartesian planning resolution, in meters
+  if (!nh.hasParam("cartesian_plan_res"))
+    nh.setParam("cartesian_plan_res", 0.005);
+
+  if (!nh.hasParam("move_group_name"))
+    nh.setParam("move_group_name", "right_ur5");
+
+  if (!nh.hasParam("move_group_planner"))
+    nh.setParam("move_group_planner", "RRTConnectkConfigDefault");
+
+  if (!nh.hasParam("velocity_scale"))
+    nh.setParam("velocity_scale", 0.1);
+
+  if (!nh.hasParam("base_frame_name"))
+    nh.setParam("base_frame_name", "base_link");
+    
+ if (!nh.hasParam("position_tolerance"))
+    nh.setParam("position_tolerance", 0.01);
+    
+ if (!nh.hasParam("orientation_tolerance"))
+    nh.setParam("orientation_tolerance", 0.0001);
+
+ // If true, the planner will try to flip the gripper +/-180 deg about Z when it cannot reach a pose
+ if (!nh.hasParam("ok_to_flip"))
+ {
+   bool temp = true;
+   nh.setParam("ok_to_flip", temp);
+  }
+}
+
+// Helper function to plan a Cartesian motion
+const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup, ros::NodeHandle &nh)
+{
+  // May want to disable collision checking or the manipulator will not approach an object.
+  bool clear_octomap;
+  if ( nh.getParam("clear_octomap", clear_octomap) )
+  {
+    move_base_to_manip::clear_octomap_client.call(empty_srv);
+  }
+  double cartesian_path_resolution;
+  nh.getParam("cartesian_plan_res", cartesian_path_resolution);
+  double fraction = moveGroup.computeCartesianPath( waypoints, cartesian_path_resolution, 0.0, trajectory);
+
+  return fraction;
 }
