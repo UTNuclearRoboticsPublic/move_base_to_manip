@@ -25,7 +25,7 @@ int main(int argc, char **argv)
   ros::AsyncSpinner spinner(2);
   spinner.start();
   ros::NodeHandle nh;
-  set_node_params(nh);
+  move_base_to_manip::set_node_params(nh);
   
   std::string move_group_name;
   nh.getParam("move_group_name", move_group_name);
