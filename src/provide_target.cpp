@@ -5,7 +5,7 @@
 
 namespace provide_target
 {
-  visualization_msgs::Marker desired_ee_pose; // Used to visualize the approach pose
+  visualization_msgs::Marker desired_ee_pose; // Stores the target pose
   bool shutdown_now = false;
 }
 
@@ -60,17 +60,32 @@ int main(int argc, char **argv)
   provide_target::desired_ee_pose.pose.orientation.z = 0.;
   provide_target::desired_ee_pose.pose.orientation.w = 1.;
 
-  // Cosmetic details for Rviz
-  provide_target::desired_ee_pose.type = visualization_msgs::Marker::CYLINDER;
-  provide_target::desired_ee_pose.scale.x = 0.09;
-  provide_target::desired_ee_pose.scale.y = 0.04;
-  provide_target::desired_ee_pose.scale.z = 0.22;
-  provide_target::desired_ee_pose.color.a = 1.0;
-  provide_target::desired_ee_pose.color.r = 0.0f;
-  provide_target::desired_ee_pose.color.g = 1.0f;
-  provide_target::desired_ee_pose.color.b = 0.0f;
+  // Cosmetic details for Rviz arrow
+  // Head is at points.at(0), tail is at points.at(1)
+  visualization_msgs::Marker arrow_marker;
+  arrow_marker.header.frame_id = "/base_link";
+  arrow_marker.header.stamp = ros::Time();
+  arrow_marker.id = 47;
+  arrow_marker.type = visualization_msgs::Marker::ARROW;
+  arrow_marker.action = visualization_msgs::Marker::ADD;
+
+  arrow_marker.scale.x = 0.02; // Shaft dia
+  arrow_marker.scale.y = 0.04;  // Head dia
+  arrow_marker.color.r = 0.0;  
+  arrow_marker.color.g = 1.0;
+  arrow_marker.color.b = 0.0;
+  arrow_marker.color.a = 1.0;
+
+  arrow_marker.points.resize(2);
+  // Head of the arrow
+  arrow_marker.points[1] = provide_target::desired_ee_pose.pose.position;
+  // Tail of the arrow
+  arrow_marker.points[0].x = provide_target::desired_ee_pose.pose.position.x;
+  arrow_marker.points[0].y = provide_target::desired_ee_pose.pose.position.y;
+  arrow_marker.points[0].z = provide_target::desired_ee_pose.pose.position.z+0.25;
+
   provide_target::desired_ee_pose.lifetime = ros::Duration();
-  approachVisualizationPublisher.publish(provide_target::desired_ee_pose);
+  approachVisualizationPublisher.publish(arrow_marker);
 
   // Start a service. Wait until another node requests the desired pose, then shut down (if requested).
   ros::ServiceServer service = nh.advertiseService("desired_robot_pose", desired_robot_pose);
