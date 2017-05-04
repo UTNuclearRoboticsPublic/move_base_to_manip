@@ -28,22 +28,9 @@ int main(int argc, char **argv)
   move_base_to_manip::set_node_params(nh);
   
   std::string move_group_name;
-  nh.getParam("move_group_name", move_group_name);
+  nh.getParam("/move_base_to_manip/move_group_name", move_group_name);
   moveit::planning_interface::MoveGroupInterface moveGroup( move_group_name );
-  std::string move_group_planner;
-  nh.getParam("move_group_planner", move_group_planner);
-  moveGroup.setPlannerId( move_group_planner );
-  double velocity_scale;
-  nh.getParam("velocity_scale", velocity_scale);
-  moveGroup.setMaxVelocityScalingFactor( velocity_scale );
-  
-  double pos_tol;
-  nh.getParam("position_tolerance", pos_tol);
-  moveGroup.setGoalPositionTolerance(pos_tol);
-  
-  double orient_tol;
-  nh.getParam("orientation_tolerance", orient_tol);
-  moveGroup.setGoalOrientationTolerance(orient_tol);
+  move_base_to_manip::setup_move_group(nh, moveGroup);
   
   moveit::planning_interface::MoveGroupInterface::Plan move_plan;
   
@@ -89,7 +76,7 @@ int main(int argc, char **argv)
 
 PLAN_AGAIN:
   bool ok_to_flip;
-  nh.getParam("ok_to_flip", ok_to_flip); 
+  nh.getParam("/move_base_to_manip/ok_to_flip", ok_to_flip); 
   if ( !moveGroup.plan(move_plan) && ok_to_flip )  // If it fails, try spinning the gripper 180deg
   {
     geometry_msgs::Quaternion gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw +3.14159);
@@ -111,7 +98,7 @@ PLAN_AGAIN:
   }
 
   bool prompt_before_motion;
-  nh.getParam("prompt_before_motion", prompt_before_motion);
+  nh.getParam("/move_base_to_manip/prompt_before_motion", prompt_before_motion);
   if ( prompt_before_motion )
   {
     char character;
@@ -165,7 +152,7 @@ PLAN_CARTESIAN_AGAIN:
     ROS_INFO_STREAM("Making the final move.");
     
     bool move_cartesian;
-    nh.getParam("move_cartesian", move_cartesian);
+    nh.getParam("/move_base_to_manip/move_cartesian", move_cartesian);
     if ( move_cartesian ) // Use a Cartesian motion, i.e. keep the end-effector orientation constant as it moves
       moveGroup.move();
     else // Execute a regular motion
@@ -193,7 +180,7 @@ PLAN_CARTESIAN_AGAIN:
   
   move_base_msgs::MoveBaseGoal goal;
   std::string base_frame_name;
-  nh.getParam("base_frame_name", base_frame_name);
+  nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   goal.target_pose.header.frame_id = base_frame_name;
   goal.target_pose.header.stamp = ros::Time::now();
 
@@ -203,7 +190,7 @@ PLAN_CARTESIAN_AGAIN:
   // motion_buffer: make the base move just a bit farther than the minimum req'd distance
   // fraction: fraction of the motion that the arm alone could complete
   double motion_buffer;
-  nh.getParam("motion_buffer", motion_buffer);
+  nh.getParam("/move_base_to_manip/motion_buffer", motion_buffer);
   goal.target_pose.pose.position.x = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.x;
   goal.target_pose.pose.position.y = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.y;
   goal.target_pose.pose.position.z = 0.; // Stay in the plane
@@ -217,27 +204,13 @@ PLAN_CARTESIAN_AGAIN:
   ros::Publisher baseVisualizationPublisher = nh.advertise<visualization_msgs::Marker>("base_pose_marker", 1);
   ros::Duration(1).sleep();
   visualization_msgs::Marker baseMarker;
-  baseMarker.header = goal.target_pose.header;
-  baseMarker.id = 927;
-  baseMarker.ns = "basic_shapes";
-  baseMarker.type = visualization_msgs::Marker::CUBE;
-  baseMarker.action = visualization_msgs::Marker::ADD;
-  baseMarker.pose = goal.target_pose.pose;
-
-  baseMarker.scale.x = 0.22;
-  baseMarker.scale.y = 0.08;
-  baseMarker.scale.z = 0.08;
-  baseMarker.color.a = 1.0;
-  baseMarker.color.r = 1.0f;
-  baseMarker.color.g = 0.0f;
-  baseMarker.color.b = 0.0f;
-  baseMarker.lifetime = ros::Duration();
+  move_base_to_manip::setup_base_marker(baseMarker, goal);
   baseVisualizationPublisher.publish(baseMarker);
   ros::Duration(1).sleep();
 
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_costmaps;
-  if ( nh.getParam("clear_costmaps", clear_costmaps) )
+  if ( nh.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
     move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
   
   ac.sendGoal(goal);
@@ -254,64 +227,64 @@ void move_base_to_manip::set_node_params(ros::NodeHandle &nh)
   // Make the base move just a bit farther than the minimum req'd distance.
   // This should be a fraction between 0-1
   // Smaller ==> Will move closer to the goal pose 
-  if (!nh.hasParam("motion_buffer"))
-    nh.setParam("motion_buffer", 0.15);
+  if (!nh.hasParam("/move_base_to_manip/motion_buffer"))
+    nh.setParam("/move_base_to_manip/motion_buffer", 0.15);
 
   // Use a Cartesian motion plan or a regular motion plan?
-  if (!nh.hasParam("move_cartesian"))
+  if (!nh.hasParam("/move_base_to_manip/move_cartesian"))
   {
     bool temp = false;
-    nh.setParam("move_cartesian", temp);
+    nh.setParam("/move_base_to_manip/move_cartesian", temp);
   }
 
   // Clear the Octomap collision scene before planning the final arm motion?
-  if (!nh.hasParam("clear_octomap"))
+  if (!nh.hasParam("/move_base_to_manip/clear_octomap"))
   {
     bool temp = true;  
-    nh.setParam("clear_octomap", temp);
+    nh.setParam("/move_base_to_manip/clear_octomap", temp);
   }
 
   // Clear the move_base costmaps before moving the base?
-  if (!nh.hasParam("clear_costmaps"))
+  if (!nh.hasParam("/move_base_to_manip/clear_costmaps"))
   {
     bool temp = true;  
-    nh.setParam("clear_costmaps", temp);
+    nh.setParam("/move_base_to_manip/clear_costmaps", temp);
   }
 
   // Prompt the user to approve each arm motion before it executes?
-  if (!nh.hasParam("prompt_before_motion"))
+  if (!nh.hasParam("/move_base_to_manip/prompt_before_motion"))
   {
     bool temp = true;
-    nh.setParam("prompt_before_motion", temp);
+    nh.setParam("/move_base_to_manip/prompt_before_motion", temp);
   }
 
   // Cartesian planning resolution, in meters
-  if (!nh.hasParam("cartesian_plan_res"))
-    nh.setParam("cartesian_plan_res", 0.005);
+  if (!nh.hasParam("/move_base_to_manip/cartesian_plan_res"))
+    nh.setParam("/move_base_to_manip/cartesian_plan_res", 0.005);
 
-  if (!nh.hasParam("move_group_name"))
-    nh.setParam("move_group_name", "right_ur5");
+  if (!nh.hasParam("/move_base_to_manip/move_group_name"))
+    nh.setParam("/move_base_to_manip/move_group_name", "right_ur5");
 
-  if (!nh.hasParam("move_group_planner"))
-    nh.setParam("move_group_planner", "RRTConnectkConfigDefault");
+  if (!nh.hasParam("/move_base_to_manip/move_group_planner"))
+    nh.setParam("/move_base_to_manip/move_group_planner", "RRTConnectkConfigDefault");
 
-  if (!nh.hasParam("velocity_scale"))
-    nh.setParam("velocity_scale", 0.1);
+  if (!nh.hasParam("/move_base_to_manip/velocity_scale"))
+    nh.setParam("/move_base_to_manip/velocity_scale", 0.1);
 
-  if (!nh.hasParam("base_frame_name"))
-    nh.setParam("base_frame_name", "base_link");
+  if (!nh.hasParam("/move_base_to_manip/base_frame_name"))
+    nh.setParam("/move_base_to_manip/base_frame_name", "base_link");
     
- if (!nh.hasParam("position_tolerance"))
-    nh.setParam("position_tolerance", 0.01);
+ if (!nh.hasParam("/move_base_to_manip/position_tolerance"))
+    nh.setParam("/move_base_to_manip/position_tolerance", 0.01);
     
- if (!nh.hasParam("orientation_tolerance"))
-    nh.setParam("orientation_tolerance", 0.0001);
+ if (!nh.hasParam("/move_base_to_manip/orientation_tolerance"))
+    nh.setParam("/move_base_to_manip/orientation_tolerance", 0.0001);
 
  // If true, the planner will try to flip the gripper +/-180 deg about Z when it cannot reach a pose
- if (!nh.hasParam("ok_to_flip"))
+ if (!nh.hasParam("/move_base_to_manip/ok_to_flip"))
  {
    bool temp = true;
-   nh.setParam("ok_to_flip", temp);
+   nh.setParam("/move_base_to_manip/ok_to_flip", temp);
   }
 }
 
@@ -320,13 +293,52 @@ const double move_base_to_manip::cartesian_motion(const std::vector<geometry_msg
 {
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_octomap;
-  if ( nh.getParam("clear_octomap", clear_octomap) )
+  if ( nh.getParam("/move_base_to_manip/clear_octomap", clear_octomap) )
   {
     move_base_to_manip::clear_octomap_client.call(empty_srv);
   }
   double cartesian_path_resolution;
-  nh.getParam("cartesian_plan_res", cartesian_path_resolution);
+  nh.getParam("/move_base_to_manip/cartesian_plan_res", cartesian_path_resolution);
   double fraction = moveGroup.computeCartesianPath( waypoints, cartesian_path_resolution, 0.0, trajectory);
 
   return fraction;
+}
+
+// Helper function to initialize move_group
+void move_base_to_manip::setup_move_group(ros::NodeHandle& nh, moveit::planning_interface::MoveGroupInterface& moveGroup)
+{
+  std::string move_group_planner;
+  nh.getParam("/move_base_to_manip/move_group_planner", move_group_planner);
+  moveGroup.setPlannerId( move_group_planner );
+  double velocity_scale;
+  nh.getParam("/move_base_to_manip/velocity_scale", velocity_scale);
+  moveGroup.setMaxVelocityScalingFactor( velocity_scale );
+  
+  double pos_tol;
+  nh.getParam("/move_base_to_manip/position_tolerance", pos_tol);
+  moveGroup.setGoalPositionTolerance(pos_tol);
+  
+  double orient_tol;
+  nh.getParam("/move_base_to_manip/orientation_tolerance", orient_tol);
+  moveGroup.setGoalOrientationTolerance(orient_tol);
+}
+
+// Helper function to set the RViz marker
+void move_base_to_manip::setup_base_marker(visualization_msgs::Marker& baseMarker, move_base_msgs::MoveBaseGoal& goal)
+{
+  baseMarker.header = goal.target_pose.header;
+  baseMarker.id = 927;
+  baseMarker.ns = "basic_shapes";
+  baseMarker.type = visualization_msgs::Marker::CUBE;
+  baseMarker.action = visualization_msgs::Marker::ADD;
+  baseMarker.pose = goal.target_pose.pose;
+
+  baseMarker.scale.x = 0.22;
+  baseMarker.scale.y = 0.08;
+  baseMarker.scale.z = 0.08;
+  baseMarker.color.a = 1.0;
+  baseMarker.color.r = 1.0f;
+  baseMarker.color.g = 0.0f;
+  baseMarker.color.b = 0.0f;
+  baseMarker.lifetime = ros::Duration();
 }

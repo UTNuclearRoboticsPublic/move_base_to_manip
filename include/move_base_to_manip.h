@@ -17,6 +17,10 @@ namespace move_base_to_manip
 
   void set_node_params(ros::NodeHandle &nh);
 
+  void setup_move_group(ros::NodeHandle& nh, moveit::planning_interface::MoveGroupInterface& moveGroup);
+
+  void setup_base_marker(visualization_msgs::Marker& baseMarker, move_base_msgs::MoveBaseGoal& goal);
+
   ros::ServiceClient clear_octomap_client;
   ros::ServiceClient clear_costmaps_client;
 
