@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>move_base_to_manip</name>
-  <version>1.0.11</version>
+  <version>1.0.12</version>
   <description>
       Move the robot base until a desired end-effector pose can be reached.
   </description>
