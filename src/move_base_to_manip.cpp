@@ -57,7 +57,17 @@ int main(int argc, char **argv)
     ros::Duration(2).sleep();
   }
 
-  // Make sure it's in the right frame
+  // Stuff the desired pose into ROS parameters for posterity
+  nh.setParam("/object_of_interest/header/frame_id", srv.response.desired_robot_pose.header.frame_id);
+  nh.setParam("/object_of_interest/pose/position/x", srv.response.desired_robot_pose.pose.position.x);
+  nh.setParam("/object_of_interest/pose/position/y", srv.response.desired_robot_pose.pose.position.y);
+  nh.setParam("/object_of_interest/pose/position/z", srv.response.desired_robot_pose.pose.position.z);
+  nh.setParam("/object_of_interest/pose/orientation/x", srv.response.desired_robot_pose.pose.orientation.x);
+  nh.setParam("/object_of_interest/pose/orientation/y", srv.response.desired_robot_pose.pose.orientation.y);
+  nh.setParam("/object_of_interest/pose/orientation/z", srv.response.desired_robot_pose.pose.orientation.z);
+  nh.setParam("/object_of_interest/pose/orientation/w", srv.response.desired_robot_pose.pose.orientation.w);
+
+  // Make sure it's in the right frame for move_base_to_manip
   std::string base_frame_name;
   nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   
