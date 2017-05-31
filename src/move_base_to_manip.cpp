@@ -45,7 +45,10 @@ int main(int argc, char **argv)
   ////////////////////////////////////////////////////////////////////////
   ros::ServiceClient client = nh.serviceClient<move_base_to_manip::desired_robot_pose>("desired_robot_pose");
   move_base_to_manip::desired_robot_pose srv;
-  srv.request.shutdown_service = true; // Shut down the service after it sends the pose.
+
+  bool shutdown_flag;
+  nh.getParam("/move_base_to_manip/shutdown", shutdown_flag);
+  srv.request.shutdown_service = shutdown_flag; // Shut down the service after it sends the pose?
   geometry_msgs::PoseStamped desired_pose;
 
   while ( !client.call(srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
@@ -53,7 +56,31 @@ int main(int argc, char **argv)
     ROS_INFO_STREAM("Waiting for the 'desired_robot_pose' service.");
     ros::Duration(2).sleep();
   }
+
+  // Make sure it's in the right frame
+  std::string base_frame_name;
+  nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   
+  tf2_ros::Buffer tfBuffer;
+
+  tf2_ros::TransformListener tf2_listener(tfBuffer);
+
+  geometry_msgs::TransformStamped tf_to_base_link_frame;
+
+  tf::TransformListener listener;
+  listener.waitForTransform(base_frame_name, srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+
+  try{
+    tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+
+    tf2::doTransform(srv.response.desired_robot_pose, desired_pose, tf_to_base_link_frame);
+  }
+
+  catch(tf2::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+
   desired_pose = srv.response.desired_robot_pose;
   
   // We don't want to move in (X,Y), initially
@@ -179,8 +206,6 @@ PLAN_CARTESIAN_AGAIN:
   }
   
   move_base_msgs::MoveBaseGoal goal;
-  std::string base_frame_name;
-  nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   goal.target_pose.header.frame_id = base_frame_name;
   goal.target_pose.header.stamp = ros::Time::now();
 
@@ -233,29 +258,25 @@ void move_base_to_manip::set_node_params(ros::NodeHandle &nh)
   // Use a Cartesian motion plan or a regular motion plan?
   if (!nh.hasParam("/move_base_to_manip/move_cartesian"))
   {
-    bool temp = false;
-    nh.setParam("/move_base_to_manip/move_cartesian", temp);
+    nh.setParam("/move_base_to_manip/move_cartesian", false);
   }
 
   // Clear the Octomap collision scene before planning the final arm motion?
   if (!nh.hasParam("/move_base_to_manip/clear_octomap"))
-  {
-    bool temp = true;  
-    nh.setParam("/move_base_to_manip/clear_octomap", temp);
+  { 
+    nh.setParam("/move_base_to_manip/clear_octomap", true);
   }
 
   // Clear the move_base costmaps before moving the base?
   if (!nh.hasParam("/move_base_to_manip/clear_costmaps"))
-  {
-    bool temp = true;  
-    nh.setParam("/move_base_to_manip/clear_costmaps", temp);
+  { 
+    nh.setParam("/move_base_to_manip/clear_costmaps", true);
   }
 
   // Prompt the user to approve each arm motion before it executes?
   if (!nh.hasParam("/move_base_to_manip/prompt_before_motion"))
   {
-    bool temp = true;
-    nh.setParam("/move_base_to_manip/prompt_before_motion", temp);
+    nh.setParam("/move_base_to_manip/prompt_before_motion", true);
   }
 
   // Cartesian planning resolution, in meters
@@ -283,8 +304,14 @@ void move_base_to_manip::set_node_params(ros::NodeHandle &nh)
  // If true, the planner will try to flip the gripper +/-180 deg about Z when it cannot reach a pose
  if (!nh.hasParam("/move_base_to_manip/ok_to_flip"))
  {
-   bool temp = true;
-   nh.setParam("/move_base_to_manip/ok_to_flip", temp);
+   nh.setParam("/move_base_to_manip/ok_to_flip", true);
+  }
+
+ // Part of the service request.
+ // True ==> May be used to signal that the server which provides the pose can shut down after the service returns.
+ if (!nh.hasParam("/move_base_to_manip/shutdown"))
+ {
+   nh.setParam("/move_base_to_manip/shutdown", true);
   }
 }
 
@@ -321,6 +348,10 @@ void move_base_to_manip::setup_move_group(ros::NodeHandle& nh, moveit::planning_
   double orient_tol;
   nh.getParam("/move_base_to_manip/orientation_tolerance", orient_tol);
   moveGroup.setGoalOrientationTolerance(orient_tol);
+
+  std::string base_frame_name;
+  nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
+  moveGroup.setPoseReferenceFrame(base_frame_name);
 }
 
 // Helper function to set the RViz marker
