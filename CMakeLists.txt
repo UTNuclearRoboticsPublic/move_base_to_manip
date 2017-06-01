@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_srvs
   tf
+  tf2
 )
 
 add_service_files(

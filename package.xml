@@ -26,5 +26,6 @@
   <depend>moveit_ros_planning_interface</depend>
   <depend>roscpp</depend>
   <depend>tf</depend>
+  <depend>tf2</depend>
   <depend>visualization_msgs</depend>
 </package>
