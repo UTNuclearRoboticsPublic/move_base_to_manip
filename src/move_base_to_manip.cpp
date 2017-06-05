@@ -40,34 +40,29 @@ int main(int argc, char **argv)
   move_base_to_manip::clear_octomap_client = nh.serviceClient<std_srvs::Empty>("clear_octomap");
   move_base_to_manip::clear_costmaps_client = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
 
+
   ////////////////////////////////////////////////////////////////////////
   // Get the desired EE pose from the "desired_robot_pose" service.
   ////////////////////////////////////////////////////////////////////////
   ros::ServiceClient client = nh.serviceClient<move_base_to_manip::desired_robot_pose>("desired_robot_pose");
-  move_base_to_manip::desired_robot_pose srv;
+  move_base_to_manip::desired_robot_pose desired_robot_pose_srv;
 
   bool shutdown_flag;
   nh.getParam("/move_base_to_manip/shutdown", shutdown_flag);
-  srv.request.shutdown_service = shutdown_flag; // Shut down the service after it sends the pose?
-  geometry_msgs::PoseStamped desired_pose;
+  desired_robot_pose_srv.request.shutdown_service = shutdown_flag; // Shut down the service after it sends the pose?
 
-  while ( !client.call(srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
+  while ( !client.call(desired_robot_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
   {
     ROS_INFO_STREAM("Waiting for the 'desired_robot_pose' service.");
     ros::Duration(2).sleep();
   }
 
-  // Stuff the desired pose into ROS parameters for posterity
-  nh.setParam("/object_of_interest/header/frame_id", srv.response.desired_robot_pose.header.frame_id);
-  nh.setParam("/object_of_interest/pose/position/x", srv.response.desired_robot_pose.pose.position.x);
-  nh.setParam("/object_of_interest/pose/position/y", srv.response.desired_robot_pose.pose.position.y);
-  nh.setParam("/object_of_interest/pose/position/z", srv.response.desired_robot_pose.pose.position.z);
-  nh.setParam("/object_of_interest/pose/orientation/x", srv.response.desired_robot_pose.pose.orientation.x);
-  nh.setParam("/object_of_interest/pose/orientation/y", srv.response.desired_robot_pose.pose.orientation.y);
-  nh.setParam("/object_of_interest/pose/orientation/z", srv.response.desired_robot_pose.pose.orientation.z);
-  nh.setParam("/object_of_interest/pose/orientation/w", srv.response.desired_robot_pose.pose.orientation.w);
+  // desired_robot_pose returns a pose in the world frame.
+  // Store it so we know the pose even as the robot moves.
+  geometry_msgs::PoseStamped desired_pose_world = desired_robot_pose_srv.response.desired_robot_pose;
 
-  // Make sure it's in the right frame for move_base_to_manip
+  // Also convert it to /base_link for further calculations
+  geometry_msgs::PoseStamped desired_pose_base_link;
   std::string base_frame_name;
   nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   
@@ -78,23 +73,21 @@ int main(int argc, char **argv)
   geometry_msgs::TransformStamped tf_to_base_link_frame;
 
   tf::TransformListener listener;
-  listener.waitForTransform(base_frame_name, srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+  listener.waitForTransform(base_frame_name, desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
 
   try{
-    tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+    tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
 
-    tf2::doTransform(srv.response.desired_robot_pose, desired_pose, tf_to_base_link_frame);
+    tf2::doTransform(desired_robot_pose_srv.response.desired_robot_pose, desired_pose_base_link, tf_to_base_link_frame);
   }
 
   catch(tf2::TransformException ex){
     ROS_ERROR("%s",ex.what());
     return false;
   }
-
-  desired_pose = srv.response.desired_robot_pose;
   
   // We don't want to move in (X,Y), initially
-  geometry_msgs::PoseStamped desired_height_orient = desired_pose;
+  geometry_msgs::PoseStamped desired_height_orient = desired_pose_base_link;
   desired_height_orient.pose.position.x = start_pose.pose.position.x;
   desired_height_orient.pose.position.y = start_pose.pose.position.y;
 
@@ -152,8 +145,8 @@ PLAN_AGAIN:
   // Calculate the X,Y vector from the EE's current pose to the desired pose
   //////////////////////////////////////////////////////////////////////////
   geometry_msgs::Vector3 vec_from_cur_pose_to_goal;
-  vec_from_cur_pose_to_goal.x = desired_pose.pose.position.x - start_pose.pose.position.x;
-  vec_from_cur_pose_to_goal.y = desired_pose.pose.position.y - start_pose.pose.position.y;
+  vec_from_cur_pose_to_goal.x = desired_pose_base_link.pose.position.x - start_pose.pose.position.x;
+  vec_from_cur_pose_to_goal.y = desired_pose_base_link.pose.position.y - start_pose.pose.position.y;
   vec_from_cur_pose_to_goal.z = 0.;
   
   /////////////////////////////////////////////////////////////
@@ -164,8 +157,8 @@ PLAN_AGAIN:
   
   std::vector<geometry_msgs::Pose> waypoints;
   geometry_msgs::Pose cartesian_target_pose; // Cartesian motion requires a Pose (not PoseStamped)
-  cartesian_target_pose.position = desired_pose.pose.position;
-  cartesian_target_pose.orientation = desired_pose.pose.orientation;
+  cartesian_target_pose.position = desired_pose_base_link.pose.position;
+  cartesian_target_pose.orientation = desired_pose_base_link.pose.orientation;
   waypoints.push_back(cartesian_target_pose);
   
   moveit_msgs::RobotTrajectory trajectory;
@@ -194,7 +187,7 @@ PLAN_CARTESIAN_AGAIN:
       moveGroup.move();
     else // Execute a regular motion
     {
-      moveGroup.setPoseTarget( desired_pose );
+      moveGroup.setPoseTarget( desired_pose_base_link );
       moveGroup.plan(move_plan);
       moveGroup.execute(move_plan);
     }
@@ -248,10 +241,77 @@ PLAN_CARTESIAN_AGAIN:
   if ( nh.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
     move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
   
-  ac.sendGoal(goal);
+  //ac.sendGoal(goal);
+
+  ///////////////////////////////////////////////////////////////////////
+  // Call a service to calculate a new camera rotation.
+  // This is helpful to keep the desired pose in view after base motion.
+  ///////////////////////////////////////////////////////////////////////
+  ros::ServiceClient look_at_pose_client = nh.serviceClient<look_at_pose::LookAtPose>("look_at_pose");
+  look_at_pose::LookAtPose look_at_pose_srv;
+
+  look_at_pose_srv.request.initial_cam_pose = moveGroup.getCurrentPose("camera_ee_link");
+
+  look_at_pose_srv.request.target_pose = desired_pose_world;
+
+  geometry_msgs::Vector3Stamped up_vector;
+  up_vector.header.frame_id = "base_link";
+  up_vector.vector.x = 0;
+  up_vector.vector.y = 0;
+  up_vector.vector.z = 1;
+  look_at_pose_srv.request.up = up_vector;
+
+ look_at_pose_srv.request.initial_cam_pose.header.frame_id.erase(0,1);  // Remove the leading "/" for tf2
+
+  // Make sure all parts of the request are in the same frame as initial_cam_pose
+  // up vector first:
+  geometry_msgs::TransformStamped tf_to_ini_cam_frame;
+
+  listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+
+  try{
+    tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+
+    tf2::doTransform(up_vector, up_vector, tf_to_ini_cam_frame);
+    up_vector.header.frame_id = look_at_pose_srv.request.initial_cam_pose.header.frame_id;
+  }
+
+  catch(tf2::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+
+  // target pose:
+  listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+
+  try{
+    tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+
+    tf2::doTransform(look_at_pose_srv.request.target_pose, look_at_pose_srv.request.target_pose, tf_to_ini_cam_frame);
+    look_at_pose_srv.request.target_pose.header.frame_id = look_at_pose_srv.request.initial_cam_pose.header.frame_id;
+  }
+
+  catch(tf2::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+
+  ROS_INFO_STREAM("move_base_to_manip: 297. This is good");
+
+  // Make the service call
+  while ( !look_at_pose_client.call(look_at_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
+  {
+    ROS_INFO_STREAM("Waiting for the 'look_at_pose' service.");
+    ros::Duration(2).sleep();
+  }
+  ROS_INFO_STREAM(look_at_pose_srv.response);  // The response is a new cam pose, PoseStamped
+
+  // Now rotate the camera
+  moveGroup.setPoseTarget( look_at_pose_srv.response.new_cam_pose );
+  moveGroup.plan(move_plan);
+  moveGroup.execute(move_plan);
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
-
   ros::shutdown();
   return SUCCESS;
 }

@@ -12,6 +12,7 @@ if(NOT EIGEN3_INCLUDE_DIRS)
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  look_at_pose
   message_generation
   moveit_core
   moveit_ros_planning
@@ -30,12 +31,14 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   geometry_msgs  # Or other packages containing msgs
+  look_at_pose
   std_srvs
   visualization_msgs
 )
 
 catkin_package(
   CATKIN_DEPENDS
+    look_at_pose
     move_base_msgs
     moveit_core
     moveit_ros_planning_interface

@@ -5,6 +5,7 @@
 //////////////////////////////////////////////////////////////////
 
 #include <actionlib/client/simple_action_client.h>
+#include <look_at_pose/LookAtPose.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include "move_base_to_manip/desired_robot_pose.h"
 #include "moveit/move_group_interface/move_group_interface.h"
