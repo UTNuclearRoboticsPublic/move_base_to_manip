@@ -80,8 +80,6 @@ int main(int argc, char **argv)
     ROS_ERROR("%s",ex.what());
     return false;
   }
-
-  desired_pose = srv.response.desired_robot_pose;
   
   // We don't want to move in (X,Y), initially
   geometry_msgs::PoseStamped desired_height_orient = desired_pose;
