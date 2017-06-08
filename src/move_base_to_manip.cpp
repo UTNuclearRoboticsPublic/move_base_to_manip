@@ -67,20 +67,14 @@ int main(int argc, char **argv)
   nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
   
   tf2_ros::Buffer tfBuffer;
-
   tf2_ros::TransformListener tf2_listener(tfBuffer);
-
-  geometry_msgs::TransformStamped tf_to_base_link_frame;
-
   tf::TransformListener listener;
   listener.waitForTransform(base_frame_name, desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
-
   try{
-    tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+    geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
 
     tf2::doTransform(desired_robot_pose_srv.response.desired_robot_pose, desired_pose_base_link, tf_to_base_link_frame);
   }
-
   catch(tf2::TransformException ex){
     ROS_ERROR("%s",ex.what());
     return false;
@@ -247,10 +241,26 @@ PLAN_CARTESIAN_AGAIN:
   // Call a service to calculate a new camera rotation.
   // This is helpful to keep the desired pose in view after base motion.
   ///////////////////////////////////////////////////////////////////////
+
+  try{
+    moveGroup.setEndEffector("camera_ee");  // Error. See the moveit Github issue.
+  }
+  catch(tf2::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+
   ros::ServiceClient look_at_pose_client = nh.serviceClient<look_at_pose::LookAtPose>("look_at_pose");
   look_at_pose::LookAtPose look_at_pose_srv;
 
-  look_at_pose_srv.request.initial_cam_pose = moveGroup.getCurrentPose("camera_ee_link");
+  look_at_pose_srv.request.initial_cam_pose.header.frame_id = "camera_ee_link";
+  look_at_pose_srv.request.initial_cam_pose.pose.position.x = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.position.y = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.position.z = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.orientation.x = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.orientation.y = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.orientation.z = 0;
+  look_at_pose_srv.request.initial_cam_pose.pose.orientation.w = 1;
 
   look_at_pose_srv.request.target_pose = desired_pose_world;
 
@@ -259,23 +269,20 @@ PLAN_CARTESIAN_AGAIN:
   up_vector.vector.x = 0;
   up_vector.vector.y = 0;
   up_vector.vector.z = 1;
-  look_at_pose_srv.request.up = up_vector;
 
- look_at_pose_srv.request.initial_cam_pose.header.frame_id.erase(0,1);  // Remove the leading "/" for tf2
+  // Remove the leading "/" for tf2
+  if ( look_at_pose_srv.request.initial_cam_pose.header.frame_id.at(0) == '/' )
+    look_at_pose_srv.request.initial_cam_pose.header.frame_id.erase(0,1);
 
   // Make sure all parts of the request are in the same frame as initial_cam_pose
   // up vector first:
-  geometry_msgs::TransformStamped tf_to_ini_cam_frame;
-
   listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(10.0) );
-
   try{
-    tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+     geometry_msgs::TransformStamped tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(1.0) );
 
     tf2::doTransform(up_vector, up_vector, tf_to_ini_cam_frame);
-    up_vector.header.frame_id = look_at_pose_srv.request.initial_cam_pose.header.frame_id;
+    look_at_pose_srv.request.up = up_vector;
   }
-
   catch(tf2::TransformException ex){
     ROS_ERROR("%s",ex.what());
     return false;
@@ -285,18 +292,14 @@ PLAN_CARTESIAN_AGAIN:
   listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
 
   try{
-    tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+    geometry_msgs::TransformStamped tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
 
     tf2::doTransform(look_at_pose_srv.request.target_pose, look_at_pose_srv.request.target_pose, tf_to_ini_cam_frame);
-    look_at_pose_srv.request.target_pose.header.frame_id = look_at_pose_srv.request.initial_cam_pose.header.frame_id;
   }
-
   catch(tf2::TransformException ex){
     ROS_ERROR("%s",ex.what());
     return false;
   }
-
-  ROS_INFO_STREAM("move_base_to_manip: 297. This is good");
 
   // Make the service call
   while ( !look_at_pose_client.call(look_at_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
@@ -304,12 +307,36 @@ PLAN_CARTESIAN_AGAIN:
     ROS_INFO_STREAM("Waiting for the 'look_at_pose' service.");
     ros::Duration(2).sleep();
   }
-  ROS_INFO_STREAM(look_at_pose_srv.response);  // The response is a new cam pose, PoseStamped
+  ROS_INFO_STREAM("New camera pose in camera_ee_link:  " << look_at_pose_srv.response.new_cam_pose);  // The response is a new cam pose, PoseStamped
 
   // Now rotate the camera
-  moveGroup.setPoseTarget( look_at_pose_srv.response.new_cam_pose );
-  moveGroup.plan(move_plan);
-  moveGroup.execute(move_plan);
+  ROS_INFO_STREAM("Waiting, then rotating the camera.");
+  ros::Duration(15).sleep();
+
+  // New cam pose in base_link
+  listener.waitForTransform( "base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+  try{
+    geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+    tf2::doTransform(look_at_pose_srv.response.new_cam_pose, look_at_pose_srv.response.new_cam_pose, tf_to_base_link_frame);
+  }
+  catch(tf2::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+  
+  ROS_INFO_STREAM( "New camera pose in base_link:  " << look_at_pose_srv.response.new_cam_pose );
+
+  currentPose = moveGroup.getCurrentPose();
+  ROS_INFO_STREAM("Current pose: " << currentPose);
+  ROS_INFO_STREAM("MoveGroup EE: " << moveGroup.getEndEffector() );
+
+
+  waypoints.clear();
+  waypoints.push_back(look_at_pose_srv.response.new_cam_pose.pose);
+  fraction = move_base_to_manip::cartesian_motion(waypoints, trajectory, moveGroup, nh);
+  ROS_INFO("Cartesian path: %.2f%% achieved", fraction * 100.);
+  moveGroup.move();
+
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
   ros::shutdown();
