@@ -242,14 +242,6 @@ PLAN_CARTESIAN_AGAIN:
   // This is helpful to keep the desired pose in view after base motion.
   ///////////////////////////////////////////////////////////////////////
 
-  try{
-    moveGroup.setEndEffector("camera_ee");  // Error. See the moveit Github issue.
-  }
-  catch(tf2::TransformException ex){
-    ROS_ERROR("%s",ex.what());
-    return false;
-  }
-
   ros::ServiceClient look_at_pose_client = nh.serviceClient<look_at_pose::LookAtPose>("look_at_pose");
   look_at_pose::LookAtPose look_at_pose_srv;
 
@@ -275,7 +267,6 @@ PLAN_CARTESIAN_AGAIN:
     look_at_pose_srv.request.initial_cam_pose.header.frame_id.erase(0,1);
 
   // Make sure all parts of the request are in the same frame as initial_cam_pose
-  // up vector first:
   listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(10.0) );
   try{
      geometry_msgs::TransformStamped tf_to_ini_cam_frame = tfBuffer.lookupTransform(look_at_pose_srv.request.initial_cam_pose.header.frame_id, up_vector.header.frame_id, ros::Time(0), ros::Duration(1.0) );
@@ -288,7 +279,7 @@ PLAN_CARTESIAN_AGAIN:
     return false;
   }
 
-  // target pose:
+
   listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
 
   try{
@@ -307,36 +298,58 @@ PLAN_CARTESIAN_AGAIN:
     ROS_INFO_STREAM("Waiting for the 'look_at_pose' service.");
     ros::Duration(2).sleep();
   }
-  ROS_INFO_STREAM("New camera pose in camera_ee_link:  " << look_at_pose_srv.response.new_cam_pose);  // The response is a new cam pose, PoseStamped
+  ROS_INFO_STREAM("Transform to new camera pose in camera_ee_link:  " << look_at_pose_srv.response.tf_cam_frame_to_new_cam_pose );  // The response
+  tf::Transform tf_cam_frame_to_new_cam_pose;
+  tf::transformMsgToTF( look_at_pose_srv.response.tf_cam_frame_to_new_cam_pose, tf_cam_frame_to_new_cam_pose );
 
   // Now rotate the camera
   ROS_INFO_STREAM("Waiting, then rotating the camera.");
   ros::Duration(15).sleep();
 
-  // New cam pose in base_link
-  listener.waitForTransform( "base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+  // Find the new EE pose in base_link.
+  // THis is extra-complicated because the EE frame of the motion planner does not match the camera frame
+  // BL=base_link, CEL=camera_ee_link
+  // P_BLprime = origin of the new BL' frame, expressed in BL
+  // Frame subscripts: 'from' first, 'to' second
+  // d: vectors
+  // R: rotation matrices
+  // Key equation:
+  // P_BLprime = R_CEL_BL*R_CELprime_CEL*d_CEL_BL + R_CEL_BL*d_CELprime_CEL + d_CEL_BL
+  
+  // R_CEL_BL: extract from transformation matrix between camera_ee_link and base_link
+  listener.waitForTransform( "base_link", "camera_ee_link", ros::Time(0), ros::Duration(10.0) );
   try{
-    geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
-    tf2::doTransform(look_at_pose_srv.response.new_cam_pose, look_at_pose_srv.response.new_cam_pose, tf_to_base_link_frame);
+     geometry_msgs::TransformStamped tf_CEL_BL_msg = tfBuffer.lookupTransform("base_link", "camera_ee_link", ros::Time(0), ros::Duration(1.0) );
+
+     tf::StampedTransform tf_CEL_BL;
+     tf::transformStampedMsgToTF( tf_CEL_BL_msg, tf_CEL_BL );
+
+    tf::Matrix3x3 R_CEL_BL = tf_CEL_BL.getBasis();
   }
   catch(tf2::TransformException ex){
     ROS_ERROR("%s",ex.what());
     return false;
   }
-  
-  ROS_INFO_STREAM( "New camera pose in base_link:  " << look_at_pose_srv.response.new_cam_pose );
 
-  currentPose = moveGroup.getCurrentPose();
-  ROS_INFO_STREAM("Current pose: " << currentPose);
-  ROS_INFO_STREAM("MoveGroup EE: " << moveGroup.getEndEffector() );
+  // R_CELprime_CEL: get this from the transform the service returned
+  tf::Matrix3x3 R_CELprime_CEL = tf_cam_frame_to_new_cam_pose.getBasis();
+
+  // d_CEL_BL: extract from transformation matrix between camera_ee_link and base_link
+
+  // R_CEL_BL: extract from transformation matrix between camera_ee_link and base_link
+
+  // d_CELprime_CEL: extract from the transform the service returned
+  tf::Vector3 d_CELprime_CEL = tf_cam_frame_to_new_cam_pose.getOrigin();
 
 
+/*
+  // Move to P_BLprime
   waypoints.clear();
   waypoints.push_back(look_at_pose_srv.response.new_cam_pose.pose);
   fraction = move_base_to_manip::cartesian_motion(waypoints, trajectory, moveGroup, nh);
   ROS_INFO("Cartesian path: %.2f%% achieved", fraction * 100.);
   moveGroup.move();
-
+*/
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
   ros::shutdown();
