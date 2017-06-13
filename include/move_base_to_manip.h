@@ -20,6 +20,8 @@ namespace move_base_to_manip
 {
   const double cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup, ros::NodeHandle& nh);
 
+  bool look_at_pose_call(ros::NodeHandle &nh, geometry_msgs::PoseStamped &desired_pose_world, tf::TransformListener &listener, look_at_pose::LookAtPose &look_at_pose_srv );
+
   void set_node_params(ros::NodeHandle &nh);
 
   void setup_move_group(ros::NodeHandle& nh, moveit::planning_interface::MoveGroupInterface& moveGroup);
