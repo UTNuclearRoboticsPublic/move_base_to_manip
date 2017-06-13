@@ -36,6 +36,3 @@ namespace move_base_to_manip
 }
 
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-
-#define SUCCESS false
-#define FAILURE true
