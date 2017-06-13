@@ -12,6 +12,7 @@
 #include "moveit_msgs/DisplayTrajectory.h"
 #include "ros/ros.h"
 #include "std_srvs/Empty.h"
+#include "tf/transform_broadcaster.h"
 #include <tf/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include "tf2_ros/transform_listener.h"

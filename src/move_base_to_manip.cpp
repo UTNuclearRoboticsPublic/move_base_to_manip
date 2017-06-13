@@ -280,9 +280,15 @@ PLAN_CARTESIAN_AGAIN:
   move_base_to_manip::setup_move_group(nh, cameraMoveGroup);
 
   // Visualize the new camera pose
+  static tf::TransformBroadcaster br;
   tf::Transform transform;
   transform.setOrigin( tf::Vector3( look_at_pose_srv.response.new_cam_pose.pose.position.x, look_at_pose_srv.response.new_cam_pose.pose.position.y, look_at_pose_srv.response.new_cam_pose.pose.position.z ) );
-  //tf::Quaternion q( look_at_pose_srv.new_cam_pose.pose.orientation.x, look_at_pose_srv.new_cam_pose.pose.orientation.y, look_at_pose_srv.new_cam_pose.pose.orientation.z, look_at_pose_srv.new_cam_pose.pose.orientation.w );
+  tf::Quaternion q( look_at_pose_srv.response.new_cam_pose.pose.orientation.x, look_at_pose_srv.response.new_cam_pose.pose.orientation.y, look_at_pose_srv.response.new_cam_pose.pose.orientation.z, look_at_pose_srv.response.new_cam_pose.pose.orientation.w );
+  while( ros::ok() )
+  {
+    ros::Duration(0.1).sleep();
+    br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "base_link", "new_cam_pose") );
+  }
 
   // Move to the new camera pose
   waypoints.clear();
