@@ -138,7 +138,7 @@ PLAN_AGAIN:
       goto PLAN_AGAIN;
   }
 
-  moveGroup.execute(move_plan);
+  //moveGroup.execute(move_plan);
   
 
   //////////////////////////////////////////////////////////////////////////
@@ -196,7 +196,6 @@ PLAN_CARTESIAN_AGAIN:
     ros::shutdown();
     return true;
   }
-  
 
   /////////////////////////////////////////////////////////////////////////////////////////
   // Based on the completed Cartesian %, how far along the (X,Y) vector must the base move?
@@ -259,36 +258,31 @@ PLAN_CARTESIAN_AGAIN:
   	return false;
   }
 
-  // Now rotate the camera
-  ROS_INFO_STREAM("Waiting, then rotating the camera.");
-  ros::Duration(15).sleep();
-
-  // New cam pose in base_link
-  listener.waitForTransform( "base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
-  try{
-    geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0) );
-    tf2::doTransform(look_at_pose_srv.response.new_cam_pose, look_at_pose_srv.response.new_cam_pose, tf_to_base_link_frame);
-  }
-  catch(tf2::TransformException ex){
-    ROS_ERROR("%s",ex.what());
-    return false;
-  }
-  ROS_INFO_STREAM( "New camera pose in base_link:  " << look_at_pose_srv.response.new_cam_pose );
-
-  // A special moveGroup planner that uses camera_ee_link as the end-effector
-  moveit::planning_interface::MoveGroupInterface cameraMoveGroup( "right_ur5_camera" );
-  move_base_to_manip::setup_move_group(nh, cameraMoveGroup);
-
   // Visualize the new camera pose
   static tf::TransformBroadcaster br;
   tf::Transform transform;
   transform.setOrigin( tf::Vector3( look_at_pose_srv.response.new_cam_pose.pose.position.x, look_at_pose_srv.response.new_cam_pose.pose.position.y, look_at_pose_srv.response.new_cam_pose.pose.position.z ) );
   tf::Quaternion q( look_at_pose_srv.response.new_cam_pose.pose.orientation.x, look_at_pose_srv.response.new_cam_pose.pose.orientation.y, look_at_pose_srv.response.new_cam_pose.pose.orientation.z, look_at_pose_srv.response.new_cam_pose.pose.orientation.w );
+  transform.setRotation(q);
+
+  tf::Matrix3x3 R(q);
+  double roll, pitch, yaw;
+  R.getRPY(roll, pitch, yaw);
+  ROS_INFO_STREAM( "RPY to new camera frame: " << roll <<"  " << pitch <<"  " << yaw ); // For debugging
+
   while( ros::ok() )
   {
     ros::Duration(0.1).sleep();
-    br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "base_link", "new_cam_pose") );
+    br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_pose") );
   }
+
+  // Now rotate the camera
+  ROS_INFO_STREAM("Waiting, then rotating the camera.");
+  ros::Duration(15).sleep();
+
+  // A special moveGroup planner that uses camera_ee_link as the end-effector
+  moveit::planning_interface::MoveGroupInterface cameraMoveGroup( "right_ur5_camera" );
+  move_base_to_manip::setup_move_group(nh, cameraMoveGroup);
 
   // Move to the new camera pose
   waypoints.clear();
@@ -347,7 +341,6 @@ bool move_base_to_manip::look_at_pose_call(ros::NodeHandle &nh, geometry_msgs::P
     ROS_ERROR("%s",ex.what());
     return false;
   }
-  ROS_INFO_STREAM("Up vector: " << up_vector);
 
   // target pose:
   listener.waitForTransform( look_at_pose_srv.request.initial_cam_pose.header.frame_id, look_at_pose_srv.request.target_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
@@ -365,7 +358,6 @@ bool move_base_to_manip::look_at_pose_call(ros::NodeHandle &nh, geometry_msgs::P
     ROS_ERROR("%s",ex.what());
     return false;
   }
-  ROS_INFO_STREAM("Target pose: " << look_at_pose_srv.request.target_pose);
 
   // Make the service call
   while ( !look_at_pose_client.call(look_at_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
@@ -373,7 +365,7 @@ bool move_base_to_manip::look_at_pose_call(ros::NodeHandle &nh, geometry_msgs::P
     ROS_INFO_STREAM("Waiting for the 'look_at_pose' service.");
     ros::Duration(2).sleep();
   }
-  ROS_INFO_STREAM("New camera pose in camera_ee_link:  " << look_at_pose_srv.response.new_cam_pose);  // The response is a new cam pose, PoseStamped
+  //ROS_INFO_STREAM("New camera pose in camera_ee_link:  " << look_at_pose_srv.response.new_cam_pose);  // The response is a new cam pose, PoseStamped
 
   return true;
 }
