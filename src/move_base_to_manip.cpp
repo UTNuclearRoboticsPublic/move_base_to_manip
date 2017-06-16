@@ -278,51 +278,30 @@ PLAN_CARTESIAN_AGAIN:
     br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
   }
 
-  // Now rotate the camera
-  // Move EE to (0,0,0), (0,0,0,1) in the new_cam_frame
-  geometry_msgs::PoseStamped pose;
-  pose.header.stamp = ros::Time::now();
-  pose.header.frame_id = "new_cam_frame";
-  pose.pose.position.x = 0; pose.pose.position.y = 0; pose.pose.position.z = 0;
-  pose.pose.orientation.x = 0; pose.pose.orientation.y = 0; pose.pose.orientation.z = 0; pose.pose.orientation.w = 1;
-  //ROS_INFO_STREAM( "Attempting to move to: " << pose );
+  // Move to the origin of new_cam_frame
+  geometry_msgs::PoseStamped camera_pose;
+  camera_pose.header.frame_id = "new_cam_frame";
+  camera_pose.header.stamp = ros::Time::now();
+  camera_pose.pose.position.x = 0; camera_pose.pose.position.y = 0; camera_pose.pose.position.z = 0;
+  camera_pose.pose.orientation.x = 0; camera_pose.pose.orientation.y = 0; camera_pose.pose.orientation.z = 0; camera_pose.pose.orientation.w = 1;
 
-  // Send the end-effector (leap_motion_on_robot) to the origin of new_cam_frame
+  // Test
+  //camera_pose = moveGroup.getCurrentPose();
+  //camera_pose.pose.position.x -= 0.01;
 
-  moveGroup.setGoalPositionTolerance( 0.2 );
-  moveGroup.setGoalOrientationTolerance( 0.15 );
-  moveGroup.setPoseTarget( pose );
-  while( !moveGroup.move() )  // Making sure new_cam_frame was published and received
-  	br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
+  // Move
+  moveGroup.setPoseTarget( camera_pose,"camera_ee_link" );
+  //moveGroup.setPoseTarget( camera_pose,"leap_motion_on_robot" );
+  moveGroup.setGoalPositionTolerance(0.1);
+  moveGroup.setGoalOrientationTolerance(0.001);
 
-  // Then, calculate the transform between camera_ee_link and leap_motion_on_robot.
-  // Invert and send the EE there... So that camera_ee_link ends up at the origin of new_cam_frame.
-  pose.header.frame_id = "leap_motion_on_robot";
-  pose.pose.position.x = 0; pose.pose.position.y = 0; pose.pose.position.z = 0;
-  pose.pose.orientation.x = 0; pose.pose.orientation.y = 0; pose.pose.orientation.z = 0; pose.pose.orientation.w = 1;
+  ROS_INFO_STREAM("End effector: " << moveGroup.getEndEffectorLink() );
 
-  listener.waitForTransform( "leap_motion_on_robot", "camera_ee_link", ros::Time(0), ros::Duration(10.0) );
-  tf::StampedTransform tf_to_leap;
-  listener.lookupTransform( "leap_motion_on_robot", "camera_ee_link", ros::Time(0), tf_to_leap );
-
-  geometry_msgs::TransformStamped tf_msg_to_leap;    // Needs to be a geometry_msgs::TransformStamped to use tf2::doTransform()
-  tf::transformStampedTFToMsg(tf_to_leap, tf_msg_to_leap);
-  ROS_INFO_STREAM("Pose before transforming: " << pose);
-  tf2::doTransform( pose, pose, tf_msg_to_leap );
-  pose.pose.position.x = -pose.pose.position.x; pose.pose.position.y = -pose.pose.position.y; pose.pose.position.z = -pose.pose.position.z;
-  pose.pose.orientation.x = 0; pose.pose.orientation.y = 0; pose.pose.orientation.z = 0; pose.pose.orientation.w = 1;  // Maintain the same orientation, for now
-  ROS_INFO_STREAM("Pose after transforming: " << pose);
-
-  moveGroup.setPoseTarget( pose );
-  moveGroup.move();
-
-/*
-  while( !moveGroup.move() )
+  while( !moveGroup.move() )  // Make sure the new frame is published and heard
   {
-    ros::Duration(0.1).sleep();
+    ros::Duration(0.01).sleep();
     br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
   }
-*/
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
   ros::shutdown();
