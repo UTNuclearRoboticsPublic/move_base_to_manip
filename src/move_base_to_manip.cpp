@@ -241,7 +241,7 @@ PLAN_CARTESIAN_AGAIN:
   if ( nh.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
     move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
   
-  //ac.sendGoal(goal);
+  ac.sendGoal(goal);
 
 
   ///////////////////////////////////////////////////////////////////////
