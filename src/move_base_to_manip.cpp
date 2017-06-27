@@ -26,281 +26,294 @@ int main(int argc, char **argv)
   spinner.start();
   ros::NodeHandle nh;
   move_base_to_manip::set_node_params(nh);
+  static tf::TransformBroadcaster br;
+  tf::Transform transform;
+  moveit::planning_interface::MoveGroupInterface::Plan move_plan;
   
   std::string move_group_name;
   nh.getParam("/move_base_to_manip/move_group_name", move_group_name);
-  moveit::planning_interface::MoveGroupInterface moveGroup( move_group_name );
-  move_base_to_manip::setup_move_group(nh, moveGroup);
-  
-  moveit::planning_interface::MoveGroupInterface::Plan move_plan;
-  
-  geometry_msgs::PoseStamped start_pose = moveGroup.getCurrentPose();
+  { // Beginning of gripperMoveGroup motion planning. The matching brace calls its destruction.
+    moveit::planning_interface::MoveGroupInterface gripperMoveGroup( move_group_name );
+    move_base_to_manip::setup_move_group(nh, gripperMoveGroup);
+    ROS_INFO_STREAM("End effector: " << gripperMoveGroup.getEndEffector() );
+    
+    geometry_msgs::PoseStamped start_pose = gripperMoveGroup.getCurrentPose();
 
-  // Set up services
-  move_base_to_manip::clear_octomap_client = nh.serviceClient<std_srvs::Empty>("clear_octomap");
-  move_base_to_manip::clear_costmaps_client = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
+    // Set up services
+    move_base_to_manip::clear_octomap_client = nh.serviceClient<std_srvs::Empty>("clear_octomap");
+    move_base_to_manip::clear_costmaps_client = nh.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
 
 
-  /////////////////////////////////////////////////////////////////
-  // Get the desired EE pose from the "desired_robot_pose" service.
-  /////////////////////////////////////////////////////////////////
-  ros::ServiceClient client = nh.serviceClient<move_base_to_manip::desired_robot_pose>("desired_robot_pose");
-  move_base_to_manip::desired_robot_pose desired_robot_pose_srv;
+    /////////////////////////////////////////////////////////////////
+    // Get the desired EE pose from the "desired_robot_pose" service.
+    /////////////////////////////////////////////////////////////////
+    ros::ServiceClient client = nh.serviceClient<move_base_to_manip::desired_robot_pose>("desired_robot_pose");
+    move_base_to_manip::desired_robot_pose desired_robot_pose_srv;
 
-  bool shutdown_flag;
-  nh.getParam("/move_base_to_manip/shutdown", shutdown_flag);
-  desired_robot_pose_srv.request.shutdown_service = shutdown_flag; // Shut down the service after it sends the pose?
-  std_msgs::String str;
-  str.data = "cylinder";
-  desired_robot_pose_srv.request.object_type = str;
-  str.data = "side";
-  desired_robot_pose_srv.request.grasp_approach = str;
+    bool shutdown_flag;
+    nh.getParam("/move_base_to_manip/shutdown", shutdown_flag);
+    desired_robot_pose_srv.request.shutdown_service = shutdown_flag; // Shut down the service after it sends the pose?
+    std_msgs::String str;
+    str.data = "cylinder";
+    desired_robot_pose_srv.request.object_type = str;
+    str.data = "side";
+    desired_robot_pose_srv.request.grasp_approach = str;
 
-  while ( !client.call(desired_robot_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
-  {
-    ROS_INFO_STREAM("Waiting for the 'desired_robot_pose' service.");
-    ros::Duration(2).sleep();
-  }
+    while ( !client.call(desired_robot_pose_srv) ) // If we couldn't read the desired pose. The service prob isn't up yet
+    {
+      ROS_INFO_STREAM("Waiting for the 'desired_robot_pose' service.");
+      ros::Duration(2).sleep();
+    }
 
-  // desired_robot_pose returns a pose in the world frame.
-  // Store it so we know the pose even as the robot moves.
-  geometry_msgs::PoseStamped desired_pose_world = desired_robot_pose_srv.response.desired_robot_pose;
+    // desired_robot_pose returns a pose in the world frame.
+    // Store it so we know the pose even as the robot moves.
+    geometry_msgs::PoseStamped desired_pose_world = desired_robot_pose_srv.response.desired_robot_pose;
 
-  // Also convert it to /base_link for further calculations
-  geometry_msgs::PoseStamped desired_pose_base_link;
-  std::string base_frame_name;
-  nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
-  
-  tf2_ros::Buffer tfBuffer;
-  tf2_ros::TransformListener tf2_listener(tfBuffer);
-  tf::TransformListener listener;
-  listener.waitForTransform(base_frame_name, desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
-  try{
-    geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0) );
+    // Also convert it to /base_link for further calculations
+    geometry_msgs::PoseStamped desired_pose_base_link;
+    std::string base_frame_name;
+    nh.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
+    
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tf2_listener(tfBuffer);
+    tf::TransformListener listener;
+    listener.waitForTransform(base_frame_name, desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0), ros::Duration(10.0) );
+    try{
+      geometry_msgs::TransformStamped tf_to_base_link_frame = tfBuffer.lookupTransform("base_link", desired_robot_pose_srv.response.desired_robot_pose.header.frame_id, ros::Time(0) );
 
-    tf2::doTransform(desired_robot_pose_srv.response.desired_robot_pose, desired_pose_base_link, tf_to_base_link_frame);
-  }
-  catch(tf2::TransformException ex){
-    ROS_ERROR("%s",ex.what());
-    return false;
-  }
-  
-  // We don't want to move in (X,Y), initially
-  geometry_msgs::PoseStamped desired_height_orient = desired_pose_base_link;
-  desired_height_orient.pose.position.x = start_pose.pose.position.x;
-  desired_height_orient.pose.position.y = start_pose.pose.position.y;
+      tf2::doTransform(desired_robot_pose_srv.response.desired_robot_pose, desired_pose_base_link, tf_to_base_link_frame);
+    }
+    catch(tf2::TransformException ex){
+      ROS_ERROR("%s",ex.what());
+      return false;
+    }
+    
+    // We don't want to move in (X,Y), initially
+    geometry_msgs::PoseStamped desired_height_orient = desired_pose_base_link;
+    desired_height_orient.pose.position.x = start_pose.pose.position.x;
+    desired_height_orient.pose.position.y = start_pose.pose.position.y;
 
-  ///////////////////////////////////////////////////
-  // Put the EE at the height & orientation we desire
-  ///////////////////////////////////////////////////
+    ///////////////////////////////////////////////////
+    // Put the EE at the height & orientation we desire
+    ///////////////////////////////////////////////////
 
-  ROS_INFO_STREAM("Moving to the desired height and orientation.");
-  moveGroup.setPoseTarget( desired_height_orient );
+    ROS_INFO_STREAM("Moving to the desired height and orientation.");
+    gripperMoveGroup.setPoseTarget( desired_height_orient );
 
-  // Get the orientation as RPY so we can manipulate it
-  tf::Quaternion gripper_quat;
-  tf::quaternionMsgToTF( desired_height_orient.pose.orientation, gripper_quat );
-  double object_roll, object_pitch, object_yaw;
-  tf::Matrix3x3(gripper_quat).getRPY(object_roll, object_pitch, object_yaw);
+    // Get the orientation as RPY so we can manipulate it
+    tf::Quaternion gripper_quat;
+    tf::quaternionMsgToTF( desired_height_orient.pose.orientation, gripper_quat );
+    double object_roll, object_pitch, object_yaw;
+    tf::Matrix3x3(gripper_quat).getRPY(object_roll, object_pitch, object_yaw);
 
-PLAN_AGAIN:
-  bool ok_to_flip;
-  nh.getParam("/move_base_to_manip/ok_to_flip", ok_to_flip); 
-  if ( !moveGroup.plan(move_plan) && ok_to_flip )  // If it fails, try spinning the gripper 180deg
-  {
-    geometry_msgs::Quaternion gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw +3.14159);
-    desired_height_orient.pose.orientation = gripper_quat_msg;
-    moveGroup.setPoseTarget( desired_height_orient );
-    if ( !moveGroup.plan(move_plan) ) // If it fails again, try spinning the gripper -180deg from the original attempt
-    {  
-      gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw -3.14159);
+  PLAN_AGAIN:
+    bool ok_to_flip;
+    nh.getParam("/move_base_to_manip/ok_to_flip", ok_to_flip); 
+    if ( !gripperMoveGroup.plan(move_plan) && ok_to_flip )  // If it fails, try spinning the gripper 180deg
+    {
+      geometry_msgs::Quaternion gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw +3.14159);
       desired_height_orient.pose.orientation = gripper_quat_msg;
-      moveGroup.setPoseTarget( desired_height_orient );
-      if( !moveGroup.plan(move_plan) ) // One last attempt
-      {
-        ROS_ERROR("Failed to reach the desired height and orientation.");
-        ROS_ERROR("Try starting from an arm position with better manipulability.");
-        ros::shutdown();
-        return false;
+      gripperMoveGroup.setPoseTarget( desired_height_orient );
+      if ( !gripperMoveGroup.plan(move_plan) ) // If it fails again, try spinning the gripper -180deg from the original attempt
+      {  
+        gripper_quat_msg = tf::createQuaternionMsgFromRollPitchYaw( 0., 0., object_yaw -3.14159);
+        desired_height_orient.pose.orientation = gripper_quat_msg;
+        gripperMoveGroup.setPoseTarget( desired_height_orient );
+        if( !gripperMoveGroup.plan(move_plan) ) // One last attempt
+        {
+          ROS_ERROR("Failed to reach the desired height and orientation.");
+          ROS_ERROR("Try starting from an arm position with better manipulability.");
+          ros::shutdown();
+          return false;
+        }
       }
     }
-  }
 
-  bool prompt_before_motion;
-  nh.getParam("/move_base_to_manip/prompt_before_motion", prompt_before_motion);
-  if ( prompt_before_motion )
-  {
-    char character;
-    ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
-    std::cin.clear();
-    std::cin.get(character);
-    if ( character != 'c' )
-      goto PLAN_AGAIN;
-  }
-
-  //moveGroup.execute(move_plan);
-  
-
-  //////////////////////////////////////////////////////////////////////////
-  // Calculate the X,Y vector from the EE's current pose to the desired pose
-  //////////////////////////////////////////////////////////////////////////
-  geometry_msgs::Vector3 vec_from_cur_pose_to_goal;
-  vec_from_cur_pose_to_goal.x = desired_pose_base_link.pose.position.x - start_pose.pose.position.x;
-  vec_from_cur_pose_to_goal.y = desired_pose_base_link.pose.position.y - start_pose.pose.position.y;
-  vec_from_cur_pose_to_goal.z = 0.;
-  
-
-  /////////////////////////////////////////////////////////////
-  // Plan a Cartesian move to the grasp pose. What % completes?
-  // If 100% complete, we're done!
-  /////////////////////////////////////////////////////////////
-  ROS_INFO_STREAM("Planning a Cartesian motion to the desired pose.");
-  
-  std::vector<geometry_msgs::Pose> waypoints;
-  geometry_msgs::Pose cartesian_target_pose; // Cartesian motion requires a Pose (not PoseStamped)
-  cartesian_target_pose = desired_pose_base_link.pose;
-  waypoints.push_back(cartesian_target_pose);
-  
-  moveit_msgs::RobotTrajectory trajectory;
-
-PLAN_CARTESIAN_AGAIN:
-  double fraction = move_base_to_manip::cartesian_motion(waypoints, trajectory, moveGroup, nh);
-  ROS_INFO("Cartesian path: %.2f%% achieved", fraction * 100.);
- 
-  if ( prompt_before_motion )
-  { 
-    char character;
-    ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
-    std::cin.ignore (INT_MAX, '\n'); // Make sure the buffer is empty. 
-    std::cin.get(character);
-    if ( character != 'c' )
-      goto PLAN_CARTESIAN_AGAIN;
-  }
- 
-  if ( ( 0.999 < fraction) && (fraction < 1.001) ) // We're there! Move then quit.
-  {
-    ROS_INFO_STREAM("Making the final move.");
-    
-    bool move_cartesian;
-    nh.getParam("/move_base_to_manip/move_cartesian", move_cartesian);
-    if ( move_cartesian ) // Use a Cartesian motion, i.e. keep the end-effector orientation constant as it moves
-      moveGroup.move();
-    else // Execute a regular motion
+    bool prompt_before_motion;
+    nh.getParam("/move_base_to_manip/prompt_before_motion", prompt_before_motion);
+    if ( prompt_before_motion )
     {
-      moveGroup.setPoseTarget( desired_pose_base_link );
-      moveGroup.plan(move_plan);
-      moveGroup.execute(move_plan);
+      char character;
+      ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
+      std::cin.clear();
+      std::cin.get(character);
+      if ( character != 'c' )
+        goto PLAN_AGAIN;
+    }
+
+    gripperMoveGroup.execute(move_plan);
+    
+
+    //////////////////////////////////////////////////////////////////////////
+    // Calculate the X,Y vector from the EE's current pose to the desired pose
+    //////////////////////////////////////////////////////////////////////////
+    geometry_msgs::Vector3 vec_from_cur_pose_to_goal;
+    vec_from_cur_pose_to_goal.x = desired_pose_base_link.pose.position.x - start_pose.pose.position.x;
+    vec_from_cur_pose_to_goal.y = desired_pose_base_link.pose.position.y - start_pose.pose.position.y;
+    vec_from_cur_pose_to_goal.z = 0.;
+    
+
+    /////////////////////////////////////////////////////////////
+    // Plan a Cartesian move to the grasp pose. What % completes?
+    // If 100% complete, we're done!
+    /////////////////////////////////////////////////////////////
+    ROS_INFO_STREAM("Planning a Cartesian motion to the desired pose.");
+    
+    std::vector<geometry_msgs::Pose> waypoints;
+    geometry_msgs::Pose cartesian_target_pose; // Cartesian motion requires a Pose (not PoseStamped)
+    cartesian_target_pose = desired_pose_base_link.pose;
+    waypoints.push_back(cartesian_target_pose);
+    
+    moveit_msgs::RobotTrajectory trajectory;
+
+  PLAN_CARTESIAN_AGAIN:
+    double fraction = move_base_to_manip::cartesian_motion(waypoints, trajectory, gripperMoveGroup, nh);
+    ROS_INFO("Cartesian path: %.2f%% achieved", fraction * 100.);
+   
+    if ( prompt_before_motion )
+    { 
+      char character;
+      ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
+      std::cin.ignore (INT_MAX, '\n'); // Make sure the buffer is empty. 
+      std::cin.get(character);
+      if ( character != 'c' )
+        goto PLAN_CARTESIAN_AGAIN;
+    }
+   
+    if ( ( 0.999 < fraction) && (fraction < 1.001) ) // We're there! Move then quit.
+    {
+      ROS_INFO_STREAM("Making the final move.");
+      
+      bool move_cartesian;
+      nh.getParam("/move_base_to_manip/move_cartesian", move_cartesian);
+      if ( move_cartesian ) // Use a Cartesian motion, i.e. keep the end-effector orientation constant as it moves
+        gripperMoveGroup.move();
+      else // Execute a regular motion
+      {
+        gripperMoveGroup.setPoseTarget( desired_pose_base_link );
+        gripperMoveGroup.plan(move_plan);
+        gripperMoveGroup.execute(move_plan);
+      }
+      
+      ros::shutdown();
+      return true;
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////////
+    // Based on the completed Cartesian %, how far along the (X,Y) vector must the base move?
+    // Move the base to that position
+    /////////////////////////////////////////////////////////////////////////////////////////
+
+    // Tell the action client that we want to spin a thread by default
+    MoveBaseClient ac("move_base", true);
+
+    while(!ac.waitForServer(ros::Duration(5.0))){
+      ROS_INFO("Waiting for the move_base action server to come up");
     }
     
-    ros::shutdown();
-    return true;
-  }
+    move_base_msgs::MoveBaseGoal goal;
+    goal.target_pose.header.frame_id = base_frame_name;
+    goal.target_pose.header.stamp = ros::Time::now();
 
-  /////////////////////////////////////////////////////////////////////////////////////////
-  // Based on the completed Cartesian %, how far along the (X,Y) vector must the base move?
-  // Move the base to that position
-  /////////////////////////////////////////////////////////////////////////////////////////
+    // Goal position = current base position + calculated change
+    // The current base position is (0,0) in /base_link by default, so we don't need to add anything
+    geometry_msgs::PoseStamped currentPose = gripperMoveGroup.getCurrentPose();
+    // motion_buffer: make the base move just a bit farther than the minimum req'd distance
+    // fraction: fraction of the motion that the arm alone could complete
+    double motion_buffer;
+    nh.getParam("/move_base_to_manip/motion_buffer", motion_buffer);
+    goal.target_pose.pose.position.x = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.x;
+    goal.target_pose.pose.position.y = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.y;
+    goal.target_pose.pose.position.z = 0.; // Stay in the plane
+    // Maintain the base's current orientation
+    goal.target_pose.pose.orientation.x = 0.;
+    goal.target_pose.pose.orientation.y = 0.;
+    goal.target_pose.pose.orientation.z = 0.;
+    goal.target_pose.pose.orientation.w = 1.;
 
-  // Tell the action client that we want to spin a thread by default
-  MoveBaseClient ac("move_base", true);
+    // Mark the calculated base location in Rviz
+    ros::Publisher baseVisualizationPublisher = nh.advertise<visualization_msgs::Marker>("base_pose_marker", 1);
+    ros::Duration(1).sleep();
+    visualization_msgs::Marker baseMarker;
+    move_base_to_manip::setup_base_marker(baseMarker, goal);
+    baseVisualizationPublisher.publish(baseMarker);
+    ros::Duration(1).sleep();
 
-  while(!ac.waitForServer(ros::Duration(5.0))){
-    ROS_INFO("Waiting for the move_base action server to come up");
-  }
-  
-  move_base_msgs::MoveBaseGoal goal;
-  goal.target_pose.header.frame_id = base_frame_name;
-  goal.target_pose.header.stamp = ros::Time::now();
+    // May want to disable collision checking or the manipulator will not approach an object.
+    bool clear_costmaps;
+    if ( nh.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
+      move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
+    
+    ac.sendGoal(goal);
 
-  // Goal position = current base position + calculated change
-  // The current base position is (0,0) in /base_link by default, so we don't need to add anything
-  geometry_msgs::PoseStamped currentPose = moveGroup.getCurrentPose();
-  // motion_buffer: make the base move just a bit farther than the minimum req'd distance
-  // fraction: fraction of the motion that the arm alone could complete
-  double motion_buffer;
-  nh.getParam("/move_base_to_manip/motion_buffer", motion_buffer);
-  goal.target_pose.pose.position.x = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.x;
-  goal.target_pose.pose.position.y = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.y;
-  goal.target_pose.pose.position.z = 0.; // Stay in the plane
-  // Maintain the base's current orientation
-  goal.target_pose.pose.orientation.x = 0.;
-  goal.target_pose.pose.orientation.y = 0.;
-  goal.target_pose.pose.orientation.z = 0.;
-  goal.target_pose.pose.orientation.w = 1.;
 
-  // Mark the calculated base location in Rviz
-  ros::Publisher baseVisualizationPublisher = nh.advertise<visualization_msgs::Marker>("base_pose_marker", 1);
+    ///////////////////////////////////////////////////////////////////////
+    // Call a service to calculate a new camera rotation.
+    // This is helpful to keep the desired pose in view after base motion.
+    ///////////////////////////////////////////////////////////////////////
+
+    // Call the service
+    look_at_pose::LookAtPose look_at_pose_srv;
+    if ( !move_base_to_manip::look_at_pose_call( nh, desired_pose_world, listener, look_at_pose_srv ) )
+    {
+    	ROS_ERROR_STREAM("move_base_to_manip: The look_at_pose service call failed.");
+    	return false;
+    }
+
+    // Create a new tf frame at new_cam_pose
+    // This helps visualize the new camera pose
+    // and is also useful for motion planning
+    transform.setOrigin( tf::Vector3( look_at_pose_srv.response.new_cam_pose.pose.position.x, look_at_pose_srv.response.new_cam_pose.pose.position.y, look_at_pose_srv.response.new_cam_pose.pose.position.z ) );
+    tf::Quaternion q( look_at_pose_srv.response.new_cam_pose.pose.orientation.x, look_at_pose_srv.response.new_cam_pose.pose.orientation.y, look_at_pose_srv.response.new_cam_pose.pose.orientation.z, look_at_pose_srv.response.new_cam_pose.pose.orientation.w );
+    transform.setRotation(q);
+
+    tf::Matrix3x3 R(q);
+    double roll, pitch, yaw;
+    R.getRPY(roll, pitch, yaw);
+    ROS_INFO_STREAM( "RPY to new camera frame: " << roll <<"  " << pitch <<"  " << yaw ); // For debugging
+
+    while( !listener.waitForTransform( "new_cam_frame", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(10.0)) )
+    {
+      ros::Duration(0.1).sleep();
+      br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
+    }
+
+    // Move to the origin of new_cam_frame
+    // Use the "right_ur5_camera" planning group
+    // Destroy the other MoveIt planner first
+  } // Force destruction of gripperMoveGroup motion planning
   ros::Duration(1).sleep();
-  visualization_msgs::Marker baseMarker;
-  move_base_to_manip::setup_base_marker(baseMarker, goal);
-  baseVisualizationPublisher.publish(baseMarker);
-  ros::Duration(1).sleep();
+  moveit::planning_interface::MoveGroupInterface camMoveGroup( "right_ur5_camera" );
 
-  // May want to disable collision checking or the manipulator will not approach an object.
-  bool clear_costmaps;
-  if ( nh.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
-    move_base_to_manip::clear_costmaps_client.call( move_base_to_manip::empty_srv );
-  
-  ac.sendGoal(goal);
+  move_base_to_manip::setup_move_group(nh, camMoveGroup);
+  camMoveGroup.setEndEffectorLink("camera_ee_link");
 
-
-  ///////////////////////////////////////////////////////////////////////
-  // Call a service to calculate a new camera rotation.
-  // This is helpful to keep the desired pose in view after base motion.
-  ///////////////////////////////////////////////////////////////////////
-
-  // Call the service
-  look_at_pose::LookAtPose look_at_pose_srv;
-  if ( !move_base_to_manip::look_at_pose_call( nh, desired_pose_world, listener, look_at_pose_srv ) )
-  {
-  	ROS_ERROR_STREAM("move_base_to_manip: The look_at_pose service call failed.");
-  	return false;
-  }
-
-  // Create a new tf frame at new_cam_pose
-  // This helps visualize the new camera pose
-  // and is also useful for motion planning
-
-  static tf::TransformBroadcaster br;
-  tf::Transform transform;
-  transform.setOrigin( tf::Vector3( look_at_pose_srv.response.new_cam_pose.pose.position.x, look_at_pose_srv.response.new_cam_pose.pose.position.y, look_at_pose_srv.response.new_cam_pose.pose.position.z ) );
-  tf::Quaternion q( look_at_pose_srv.response.new_cam_pose.pose.orientation.x, look_at_pose_srv.response.new_cam_pose.pose.orientation.y, look_at_pose_srv.response.new_cam_pose.pose.orientation.z, look_at_pose_srv.response.new_cam_pose.pose.orientation.w );
-  transform.setRotation(q);
-
-  tf::Matrix3x3 R(q);
-  double roll, pitch, yaw;
-  R.getRPY(roll, pitch, yaw);
-  ROS_INFO_STREAM( "RPY to new camera frame: " << roll <<"  " << pitch <<"  " << yaw ); // For debugging
-
-  while( !listener.waitForTransform( "new_cam_frame", look_at_pose_srv.response.new_cam_pose.header.frame_id, ros::Time(0), ros::Duration(10.0)) )
-  {
-    ros::Duration(0.1).sleep();
-    br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
-  }
-
-  // Move to the origin of new_cam_frame
   geometry_msgs::PoseStamped camera_pose;
   camera_pose.header.frame_id = "new_cam_frame";
   camera_pose.header.stamp = ros::Time::now();
   camera_pose.pose.position.x = 0; camera_pose.pose.position.y = 0; camera_pose.pose.position.z = 0;
   camera_pose.pose.orientation.x = 0; camera_pose.pose.orientation.y = 0; camera_pose.pose.orientation.z = 0; camera_pose.pose.orientation.w = 1;
 
-  // Test
-  //camera_pose = moveGroup.getCurrentPose();
-  //camera_pose.pose.position.x -= 0.01;
+
+  // Test pose
+  //camera_pose = camMoveGroup.getCurrentPose();
+  //camera_pose.pose.position.z -= 0.05;
 
   // Move
-  moveGroup.setPoseTarget( camera_pose,"camera_ee_link" );
-  //moveGroup.setPoseTarget( camera_pose,"leap_motion_on_robot" );
-  moveGroup.setGoalPositionTolerance(0.1);
-  moveGroup.setGoalOrientationTolerance(0.001);
+  camMoveGroup.setPoseTarget( camera_pose );
+  camMoveGroup.setGoalPositionTolerance(0.01);
+  camMoveGroup.setGoalOrientationTolerance(0.05);
 
-  ROS_INFO_STREAM("End effector: " << moveGroup.getEndEffectorLink() );
+  ROS_INFO_STREAM("End effector: " << camMoveGroup.getEndEffector() );
+  //ROS_INFO_STREAM("Target pose: " << camMoveGroup.getPoseTarget() );
 
-  while( !moveGroup.move() )  // Make sure the new frame is published and heard
+  br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
+  ros::Duration(0.005).sleep();
+  while( !camMoveGroup.move() )  // Make sure the new frame is published and heard
   {
-    ros::Duration(0.01).sleep();
+    ros::Duration(0.005).sleep();
     br.sendTransform( tf::StampedTransform(transform, ros::Time::now(), "camera_ee_link", "new_cam_frame") );
+    ROS_INFO_STREAM("Re-planning...");
   }
 
   // If the robot still can't reach the goal (it should be very close), run this program again.
@@ -420,7 +433,7 @@ void move_base_to_manip::set_node_params(ros::NodeHandle &nh)
     nh.setParam("/move_base_to_manip/cartesian_plan_res", 0.005);
 
   if (!nh.hasParam("/move_base_to_manip/move_group_name"))
-    nh.setParam("/move_base_to_manip/move_group_name", "right_ur5");
+    nh.setParam("/move_base_to_manip/move_group_name", "right_ur5_temoto");
 
   if (!nh.hasParam("/move_base_to_manip/move_group_planner"))
     nh.setParam("/move_base_to_manip/move_group_planner", "RRTConnectkConfigDefault");
