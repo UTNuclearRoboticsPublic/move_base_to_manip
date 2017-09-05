@@ -16,6 +16,8 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
   <depend>eigen</depend>
   <depend>geometry_msgs</depend>
   <depend>interactive_markers</depend>

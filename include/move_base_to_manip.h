@@ -4,9 +4,9 @@
 // Andy Zelenak, 2017
 //////////////////////////////////////////////////////////////////
 
-#include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/simple_action_server.h>
 #include <move_base_msgs/MoveBaseAction.h>
-#include "move_base_to_manip/desired_robot_pose.h"
+#include <move_base_to_manip/desired_poseAction.h>
 #include "moveit/move_group_interface/move_group_interface.h"
 #include "moveit_msgs/DisplayTrajectory.h"
 #include "ros/ros.h"
@@ -15,24 +15,25 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include "tf2_ros/transform_listener.h"
 
-namespace move_base_to_manip
+class base_planner
 {
-  const double cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup, ros::NodeHandle& nh);
+private:
 
-  void set_node_params(ros::NodeHandle &nh);
+  // Set node parameters, if they aren't defined in a launch file
+  void set_node_params();
 
-  void setup_move_group(ros::NodeHandle& nh, moveit::planning_interface::MoveGroupInterface& moveGroup);
+  // Once a goal is received, start planning and moving
+  void do_motion_CB( const move_base_to_manip::desired_poseGoalConstPtr& goal );
 
-  void setup_base_marker(visualization_msgs::Marker& baseMarker, move_base_msgs::MoveBaseGoal& goal);
+  ros::NodeHandle nh_;
+  actionlib::SimpleActionServer<move_base_to_manip::desired_poseAction> as_;
+  moveit::planning_interface::MoveGroupInterface::Plan move_plan_;
 
-  ros::ServiceClient clear_octomap_client;
-  ros::ServiceClient clear_costmaps_client;
+public:
+  // Constructor
+  base_planner();
 
-  // An empty service call
-  std_srvs::Empty empty_srv;
-}
-
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+};
 
 #define SUCCESS false
 #define FAILURE true

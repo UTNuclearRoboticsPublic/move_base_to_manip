@@ -12,6 +12,8 @@ if(NOT EIGEN3_INCLUDE_DIRS)
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
+  actionlib_msgs
   message_generation
   moveit_core
   moveit_ros_planning
@@ -22,20 +24,20 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
 )
 
-add_service_files(
-  FILES
-  desired_robot_pose.srv
+add_action_files(
+  DIRECTORY action
+  FILES desired_pose.action
 )
 
 generate_messages(
   DEPENDENCIES
-  geometry_msgs  # Or other packages containing msgs
-  std_srvs
-  visualization_msgs
+  actionlib_msgs
+  geometry_msgs
 )
 
 catkin_package(
   CATKIN_DEPENDS
+    actionlib_msgs
     move_base_msgs
     moveit_core
     moveit_ros_planning_interface

@@ -1,3 +1,0 @@
-bool shutdown_service
----
-geometry_msgs/PoseStamped desired_robot_pose
