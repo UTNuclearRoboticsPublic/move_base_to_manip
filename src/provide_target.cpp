@@ -43,7 +43,6 @@ int main(int argc, char **argv)
   move_base_to_manip::desired_poseGoal goal;
   goal.desired_pose = goal_pose;
   ROS_INFO("[provide_target] Sending goal.");
-  ROS_INFO_STREAM(goal);
   ac.sendGoal(goal);
 
   return 0;

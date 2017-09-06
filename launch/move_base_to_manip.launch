@@ -1,3 +1,3 @@
 <launch>
-	<node name="move_base_to_manip" pkg="move_base_to_manip" type="move_base_to_manip" ns="move_base_to_manip" />
+	<node name="move_base_to_manip" pkg="move_base_to_manip" type="move_base_to_manip" output="screen" />
 </launch>
