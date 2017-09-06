@@ -12,33 +12,34 @@ if(NOT EIGEN3_INCLUDE_DIRS)
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
-  look_at_pose
+  actionlib
+  actionlib_msgs
   message_generation
   moveit_core
   moveit_ros_planning
   moveit_ros_planning_interface
   roscpp
   std_srvs
+  temoto
   tf
   tf2_geometry_msgs
 )
 
-add_service_files(
-  FILES
-  desired_robot_pose.srv
+add_action_files(
+  DIRECTORY action
+  FILES desired_pose.action
 )
 
 generate_messages(
   DEPENDENCIES
-  geometry_msgs  # Or other packages containing msgs
-  look_at_pose
-  std_srvs
-  visualization_msgs
+  actionlib_msgs
+  geometry_msgs
 )
 
 catkin_package(
   CATKIN_DEPENDS
-    look_at_pose
+    actionlib_msgs
+    message_runtime
     move_base_msgs
     moveit_core
     moveit_ros_planning_interface
@@ -82,7 +83,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   FILES_MATCHING PATTERN "*.h"
 )
 
-install(DIRECTORY srv
+install(DIRECTORY action
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 

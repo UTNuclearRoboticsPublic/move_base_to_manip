@@ -1,5 +1,0 @@
-bool shutdown_service
-std_msgs/String object_type
-std_msgs/String grasp_approach
----
-geometry_msgs/PoseStamped desired_robot_pose
