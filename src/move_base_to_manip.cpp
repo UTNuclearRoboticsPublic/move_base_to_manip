@@ -86,6 +86,8 @@ void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConst
   ROS_INFO_STREAM("[move_base_to_manip] Moving to the desired height and orientation.");
   move_group.setPoseTarget( desired_height_orient );
 
+  ROS_INFO_STREAM("[move_base_to_manip] Target pose: " << desired_height_orient );
+
   // Get the orientation as RPY so we can manipulate it
   tf::Quaternion gripper_quat;
   tf::quaternionMsgToTF( desired_height_orient.pose.orientation, gripper_quat );
