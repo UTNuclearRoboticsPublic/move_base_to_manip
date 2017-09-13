@@ -1,4 +1,4 @@
 <launch>
 	<node name="move_base_to_manip" pkg="move_base_to_manip" type="move_base_to_manip" output="screen" />
-	<param name="/move_base_to_manip/move_group_name" type="string" value="right_ur5" />
+	<param name="/move_base_to_manip/move_group_name" type="string" value="right_ur5_temoto" />
 </launch>
