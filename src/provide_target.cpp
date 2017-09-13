@@ -16,6 +16,7 @@ using namespace provide_target;
 
 void goal_pose_CB(const temoto::Status::ConstPtr& msg)
 {
+  ROS_INFO_STREAM("[provide_target] incoming msg: " << msg);
   goal_pose = msg->commanded_pose;
 }
 

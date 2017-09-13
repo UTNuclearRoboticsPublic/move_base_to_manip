@@ -53,6 +53,7 @@ base_planner::base_planner():
 /////////////////////////////////////////////////////
 void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConstPtr& goal )
 {
+
   ROS_INFO("[move_base_to_manip] Received a new goal. Moving.");
 
   // Initialize MoveGroup for the arm
@@ -85,8 +86,6 @@ void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConst
   ///////////////////////////////////////////////////
   ROS_INFO_STREAM("[move_base_to_manip] Moving to the desired height and orientation.");
   move_group.setPoseTarget( desired_height_orient );
-
-  ROS_INFO_STREAM("[move_base_to_manip] Target pose: " << desired_height_orient );
 
   // Get the orientation as RPY so we can manipulate it
   tf::Quaternion gripper_quat;
@@ -124,7 +123,9 @@ PLAN_AGAIN:
   if ( prompt_before_motion )
   {
     char character;
+    ROS_INFO_STREAM("-----------------------------------------");
     ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
+    ROS_INFO_STREAM("-----------------------------------------");
     std::cin.clear();
     std::cin.get(character);
     if ( character != 'c' )
@@ -163,7 +164,9 @@ PLAN_CARTESIAN_AGAIN:
   if ( prompt_before_motion )
   { 
     char character;
+    ROS_INFO_STREAM("-----------------------------------------");
     ROS_INFO_STREAM("Enter 'c' to continue, otherwise re-plan.");
+    ROS_INFO_STREAM("-----------------------------------------");
     std::cin.ignore (INT_MAX, '\n'); // Make sure the buffer is empty. 
     std::cin.get(character);
     if ( character != 'c' )
@@ -204,9 +207,9 @@ PLAN_CARTESIAN_AGAIN:
     ROS_INFO("Waiting for the move_base action server to come up");
   }
   
-  move_base_msgs::MoveBaseGoal goal;
-  goal.target_pose.header.frame_id = base_frame_name;
-  goal.target_pose.header.stamp = ros::Time::now();
+  move_base_msgs::MoveBaseGoal mb_goal;
+  mb_goal.target_pose.header.frame_id = base_frame_name;
+  mb_goal.target_pose.header.stamp = ros::Time::now();
 
   // Goal position = current base position + calculated change
   // The current base position is (0,0) in /base_link by default, so we don't need to add anything
@@ -215,21 +218,22 @@ PLAN_CARTESIAN_AGAIN:
   // fraction: fraction of the motion that the arm alone could complete
   double motion_buffer;
   nh_.getParam("/move_base_to_manip/motion_buffer", motion_buffer);
-  goal.target_pose.pose.position.x = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.x;
-  goal.target_pose.pose.position.y = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.y;
-  goal.target_pose.pose.position.z = 0.; // Stay in the plane
+  mb_goal.target_pose.pose.position.x = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.x;
+  mb_goal.target_pose.pose.position.y = (1-motion_buffer*fraction)*vec_from_cur_pose_to_goal.y;
+  mb_goal.target_pose.pose.position.z = 0.; // Stay in the plane
   // Maintain the base's current orientation
-  goal.target_pose.pose.orientation.x = 0.;
-  goal.target_pose.pose.orientation.y = 0.;
-  goal.target_pose.pose.orientation.z = 0.;
-  goal.target_pose.pose.orientation.w = 1.;
+  mb_goal.target_pose.pose.orientation.x = 0.;
+  mb_goal.target_pose.pose.orientation.y = 0.;
+  mb_goal.target_pose.pose.orientation.z = 0.;
+  mb_goal.target_pose.pose.orientation.w = 1.;
 
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_costmaps;
   if ( nh_.getParam("/move_base_to_manip/clear_costmaps", clear_costmaps) )
     base_planner::clear_costmaps_client_.call( empty_srv_ );
   
-  ac.sendGoal(goal);
+  ac.sendGoal(mb_goal);
+
 
   ///////////////////////////////////////////
   // Tell the action client that we succeeded
