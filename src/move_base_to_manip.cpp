@@ -64,6 +64,9 @@ void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConst
   // get the current EE pose
   geometry_msgs::PoseStamped start_pose = move_group.getCurrentPose();
 
+  //ROS_INFO_STREAM("[move_base_to_manip] starting pose: " << start_pose);
+  //ROS_INFO_STREAM("[move_base_to_manip] goal: " << goal->desired_pose);
+
   // make sure the goal is in the right frame
   std::string base_frame_name;
   nh_.getParam("/move_base_to_manip/base_frame_name", base_frame_name);
@@ -112,7 +115,7 @@ PLAN_AGAIN:
       {
         ROS_ERROR("Failed to reach the desired height and orientation.");
         ROS_ERROR("Try starting from an arm position with better manipulability.");
-        ros::shutdown();
+
         return;
       }
     }

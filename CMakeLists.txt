@@ -20,7 +20,6 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning_interface
   roscpp
   std_srvs
-  temoto
   tf
   tf2_geometry_msgs
 )
@@ -55,12 +54,8 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(provide_target src/provide_target.cpp)
-add_dependencies(provide_target ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
-target_link_libraries(provide_target ${catkin_LIBRARIES} )
-
 add_executable(move_base_to_manip src/move_base_to_manip.cpp)
-add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
+add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}    vaultbot_irp )
 target_link_libraries(move_base_to_manip ${catkin_LIBRARIES} )
 
 
@@ -72,7 +67,7 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 link_directories(${catkin_LIBRARY_DIRS})
 
-install(TARGETS move_base_to_manip provide_target
+install(TARGETS move_base_to_manip
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
