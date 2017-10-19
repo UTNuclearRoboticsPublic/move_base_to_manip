@@ -58,7 +58,7 @@ void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConst
   // Initialize MoveGroup for the arm
   std::string move_group_name;
   nh_.getParam("/move_base_to_manip/move_group_name", move_group_name);
-  moveit::planning_interface::MoveGroupInterface move_group( move_group_name );
+  moveit::planning_interface::MoveGroup move_group( move_group_name );
 
   // get the current EE pose
   geometry_msgs::PoseStamped start_pose = move_group.getCurrentPose();
@@ -92,7 +92,7 @@ void base_planner::do_motion_CB( const move_base_to_manip::desired_poseGoalConst
   double object_roll, object_pitch, object_yaw;
   tf::Matrix3x3(gripper_quat).getRPY(object_roll, object_pitch, object_yaw);
 
-  moveit::planning_interface::MoveGroupInterface::Plan move_plan;
+  moveit::planning_interface::MoveGroup::Plan move_plan;
 
 PLAN_AGAIN:
   bool ok_to_flip;
@@ -242,7 +242,7 @@ PLAN_CARTESIAN_AGAIN:
 /////////////////////////////////////////////
 // Helper function to plan a Cartesian motion
 /////////////////////////////////////////////
-const double base_planner::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& move_group)
+const double base_planner::cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroup& move_group)
 {
   // May want to disable collision checking or the manipulator will not approach an object.
   bool clear_octomap;

@@ -8,7 +8,7 @@
 #include <actionlib/server/simple_action_server.h>  // This node itself is an action server
 #include <move_base_msgs/MoveBaseAction.h>
 #include <move_base_to_manip/desired_poseAction.h>
-#include "moveit/move_group_interface/move_group_interface.h"
+#include "moveit/move_group_interface/move_group.h"
 #include "moveit_msgs/DisplayTrajectory.h"
 #include "ros/ros.h"
 #include "std_srvs/Empty.h"
@@ -29,11 +29,11 @@ private:
   void do_motion_CB( const move_base_to_manip::desired_poseGoalConstPtr& goal );
 
   // Helper function to plan a Cartesian motion
-  const double cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroupInterface& moveGroup);
+  const double cartesian_motion(const std::vector<geometry_msgs::Pose>& waypoints, moveit_msgs::RobotTrajectory& trajectory, moveit::planning_interface::MoveGroup& moveGroup);
 
   ros::NodeHandle nh_;
   actionlib::SimpleActionServer<move_base_to_manip::desired_poseAction> as_;
-  moveit::planning_interface::MoveGroupInterface::Plan move_plan_;
+  moveit::planning_interface::MoveGroup::Plan move_plan_;
   ros::ServiceClient clear_costmaps_client_ = nh_.serviceClient<std_srvs::Empty>("/move_base/clear_costmaps");
   ros::ServiceClient clear_octomap_client_ = nh_.serviceClient<std_srvs::Empty>("clear_octomap");
   std_srvs::Empty empty_srv_;
