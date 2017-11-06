@@ -55,7 +55,7 @@ catkin_package(
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(move_base_to_manip src/move_base_to_manip.cpp)
-add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}    vaultbot_irp )
+add_dependencies(move_base_to_manip ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}    arm_server )
 target_link_libraries(move_base_to_manip ${catkin_LIBRARIES} )
 
 
